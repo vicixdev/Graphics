@@ -797,10 +797,10 @@ void gpuTestSignalWritingOnGpuPtr(Test* test) {
 	gpuMemCpy(commandBuffer, gpuSignalMemory, gpuSignalMemory, sizeof(uint64_t), &result);
 	TEST_ASSERT(test, result == GPU_SUCCESS);
 
-	gpuSignalAfter(commandBuffer, GPU_STAGE_TRANSFER, gpuSignalMemory, 1, GPU_SIGNAL_ATOMIC_SET, &result);
+	gpuSignalAfter(commandBuffer, GPU_STAGE_TRANSFER, gpuSignalMemory, 1, GPU_SIGNAL_ATOMIC_MAX, &result);
 	TEST_ASSERT(test, result == GPU_SUCCESS);
 
-	gpuWaitBefore(commandBuffer, GPU_STAGE_TRANSFER, gpuSignalMemory, 1, GPU_OP_EQUAL, GPU_HAZARD_NONE, -1, &result);
+	gpuWaitBefore(commandBuffer, GPU_STAGE_TRANSFER, gpuSignalMemory, 1, GPU_OP_GREATER_EQUAL, GPU_HAZARD_NONE, -1, &result);
 	TEST_ASSERT(test, result == GPU_SUCCESS);
 
 	gpuSubmitWithSignal(queue, &commandBuffer, 1, semaphore, 1, &result);

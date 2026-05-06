@@ -6,7 +6,7 @@
 #include <lib/metal4/context.h>
 #include <lib/metal4/tables.h>
 #include <lib/metal4/allocation.h>
-#include <lib/metal4/fences.h>
+#include <lib/metal4/events.h>
 #include <lib/metal4/semaphores.h>
 
 Mtl4CommandBufferStorage gMtl4CommandBufferStorage;
@@ -164,7 +164,6 @@ void mtl4MemCpy(GpuCommandBuffer cb, void* destGpu, void* srcGpu, size_t size, G
 		return;
 	}
 
-	// NOTE: Let's assume that the source buffer is committed. The validation layer will ensure this.
 	[metadata->computeEncoder
 	 	copyFromBuffer:sourceMetadata->buffer sourceOffset:source.offset
 		toBuffer:destinationMetadata->buffer destinationOffset:destination.offset

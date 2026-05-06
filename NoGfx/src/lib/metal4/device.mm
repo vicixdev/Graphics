@@ -4,7 +4,7 @@
 #include <lib/metal4/allocation.h>
 #include <lib/metal4/pipelines.h>
 #include <lib/metal4/command_buffers.h>
-#include <lib/metal4/fences.h>
+#include <lib/metal4/events.h>
 
 static const GpuSignal gMtl4SupportedSignals[] = { GPU_SIGNAL_ATOMIC_MAX };
 static const GpuOp gMtl4SupportedWaitOps[] = { GPU_OP_GREATER_EQUAL };

@@ -30,7 +30,7 @@
 #include <lib/metal4/pipelines.mm>
 #include <lib/metal4/queue.mm>
 #include <lib/metal4/command_buffers.mm>
-#include <lib/metal4/fences.mm>
+#include <lib/metal4/events.mm>
 #include <lib/metal4/semaphores.mm>
 #include <lib/metal4/validation.mm>
 #include <lib/metal4/deletion_manager.cpp>
