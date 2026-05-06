@@ -123,20 +123,20 @@ void mtl4SelectDevice(GpuDeviceId deviceId, GpuResult* result) {
 		return;
 	}
 
-	mtl4InitCommandBufferStorage(&localResult);
+	mtl4InitEventStorage(&localResult);
 	if (localResult != GPU_SUCCESS) {
 		mtl4FiniPipelineStorage();
-		mtl4FiniCommandBufferStorage();
+		mtl4FiniEventStorage();
 
 		CMN_SET_RESULT(result, localResult);
 		return;
 	}
 
-	mtl4InitEventStorage(&localResult);
+	mtl4InitCommandBufferStorage(&localResult);
 	if (localResult != GPU_SUCCESS) {
 		mtl4FiniPipelineStorage();
-		mtl4FiniCommandBufferStorage();
 		mtl4FiniEventStorage();
+		mtl4FiniCommandBufferStorage();
 
 		CMN_SET_RESULT(result, localResult);
 		return;

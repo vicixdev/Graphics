@@ -16,6 +16,7 @@ typedef struct Mtl4EventStorage {
 	CmnPage		page;
 	CmnArena	arena;
 
+	id<MTLResidencySet> uploadBufferResidencySet;
 	id<MTLBuffer>	signaledValuesUploadBuffer;
 	uint64_t	uploadBufferSize;
 	uint64_t	uploadBufferUsed;

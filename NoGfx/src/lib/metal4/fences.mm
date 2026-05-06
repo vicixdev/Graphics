@@ -32,6 +32,15 @@ void mtl4InitEventStorage(GpuResult* result) {
 	gMtl4EventStorage.uploadBufferSize = 1024 * 1024;
 	gMtl4EventStorage.uploadBufferUsed = 0;
 
+	MTLResidencySetDescriptor* residencySetDescriptor = [MTLResidencySetDescriptor new];
+	defer ([residencySetDescriptor release]);
+	residencySetDescriptor.initialCapacity = 1;
+	residencySetDescriptor.label = @"Signaled values upload residency set";
+
+	gMtl4EventStorage.uploadBufferResidencySet = [gMtl4Context.device newResidencySetWithDescriptor:residencySetDescriptor error:nil];
+	[gMtl4EventStorage.uploadBufferResidencySet addAllocation:gMtl4EventStorage.signaledValuesUploadBuffer];
+	[gMtl4EventStorage.uploadBufferResidencySet commit];
+
 	if (gMtl4EventStorage.signaledValuesUploadBuffer == nil) {
 		CMN_SET_RESULT(result, GPU_OUT_OF_GPU_MEMORY);
 		return;
@@ -170,7 +179,7 @@ void mtl4SignalEvent(
 
 	uintptr_t gpuPtrOffsetFromBase = mtl4GpuAddressOffsetFromBase(gpuPtr);
 
-	// size_t fenceUploadValueOffset = mtl4UploadFenceValue(value);
+	size_t fenceUploadValueOffset = mtl4UploadFenceValue(value);
 
 	if ([commandBuffer->computeEncoder stages] != 0) {
 		[commandBuffer->computeEncoder endEncoding];
@@ -178,18 +187,18 @@ void mtl4SignalEvent(
 	}
 
 	// TODO: Figure out the big buffer
-	id<MTLBuffer> uploadBuffer = [gMtl4Context.device newBufferWithBytes:&value length:sizeof(uint64_t) options:MTLResourceStorageModePrivate];
-	*(uint64_t*)[uploadBuffer contents] = value;
-	defer ([uploadBuffer release]);
+	// id<MTLBuffer> uploadBuffer = [gMtl4Context.device newBufferWithBytes:&value length:sizeof(uint64_t) options:MTLResourceStorageModePrivate];
+	// *(uint64_t*)[uploadBuffer contents] = value;
+	// defer ([uploadBuffer release]);
 
 	*(uint64_t*)[gMtl4EventStorage.signaledValuesUploadBuffer contents] = value;
 
 	[commandBuffer->computeEncoder barrierAfterQueueStages:MTLStageAll beforeStages:MTLStageBlit visibilityOptions:MTL4VisibilityOptionDevice | MTL4VisibilityOptionResourceAlias];
 	[commandBuffer->computeEncoder
-		// copyFromBuffer:gMtl4EventStorage.signaledValuesUploadBuffer
-		// sourceOffset:fenceUploadValueOffset
-		copyFromBuffer:uploadBuffer
-		sourceOffset:0
+		copyFromBuffer:gMtl4EventStorage.signaledValuesUploadBuffer
+		sourceOffset:fenceUploadValueOffset
+		// copyFromBuffer:uploadBuffer
+		// sourceOffset:0
 		toBuffer:allocation->buffer
 		destinationOffset:gpuPtrOffsetFromBase
 		size:sizeof(uint64_t)];

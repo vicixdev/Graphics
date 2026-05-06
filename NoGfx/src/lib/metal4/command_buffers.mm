@@ -35,6 +35,8 @@ void mtl4InitCommandBufferStorage(GpuResult* result) {
 		}
 
 		gMtl4CommandBufferStorage.queues[i] = queue;
+		[queue addResidencySet:gMtl4AllocationStorage.residencySet];
+		[queue addResidencySet:gMtl4EventStorage.uploadBufferResidencySet];
 	}
 
 	for (size_t i = 0; i < MTL4_MAX_PARALLEL_COMMANDBUFFER_ENCODINGS; i++) {
@@ -96,6 +98,8 @@ GpuCommandBuffer mtl4StartCommandEncoding(GpuQueue queue, GpuResult* result) {
 
 	uint64_t submitCount = cmnAtomicLoad(&gMtl4CommandBufferStorage.submitCount);
 	[metadata->queue waitForEvent:submitEvent value:submitCount];
+
+	[gMtl4AllocationStorage.residencySet commit];
 
 	CMN_SET_RESULT(result, GPU_SUCCESS);
 	return mtl4HandleToGpuCommandBuffer(handle);
