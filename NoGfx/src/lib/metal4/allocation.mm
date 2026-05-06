@@ -7,9 +7,9 @@
 Mtl4AllocationStorage gMtl4AllocationStorage;
 
 static MTLResourceOptions gMtl4ResourceOptionsFor[] = {
-	/*GPU_MEMORY_DEFAULT=*/		MTLResourceStorageModeShared | MTLResourceCPUCacheModeWriteCombined | MTLResourceHazardTrackingModeUntracked,
-	/*GPU_MEMORY_GPU=*/		MTLResourceStorageModePrivate | MTLResourceHazardTrackingModeUntracked,
-	/*GPU_MEMORY_READBACK=*/	MTLResourceStorageModeShared | MTLResourceCPUCacheModeDefaultCache | MTLResourceHazardTrackingModeUntracked
+	/*GPU_MEMORY_DEFAULT=*/		MTLResourceStorageModeShared |  MTLResourceCPUCacheModeWriteCombined,
+	/*GPU_MEMORY_GPU=*/		MTLResourceStorageModePrivate,
+	/*GPU_MEMORY_READBACK=*/	MTLResourceStorageModeShared | MTLResourceCPUCacheModeDefaultCache,
 };
 
 void mtl4InitAllocationStorage(GpuResult* result) {

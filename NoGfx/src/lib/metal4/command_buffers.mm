@@ -126,10 +126,10 @@ void mtl4SubmitWithSignal(
 		return;
 	}
 
-	for (size_t i = 0; i < (commandBufferCount - 1); i++) {
-		mtl4SubmitSingleBuffer(queue, commandBuffers[i], 0, 0, result);
+	for (size_t i = 0; i < commandBufferCount; i++) {
+		mtl4SubmitSingleBuffer(queue, commandBuffers[i], semaphoreMetadata->events[i], value, result);
 	}
-	mtl4SubmitSingleBuffer(queue, commandBuffers[commandBufferCount - 1], semaphoreMetadata, value, result);
+	semaphoreMetadata->lastSignalCount = commandBufferCount;
 }
 void mtl4MemCpy(GpuCommandBuffer cb, void* destGpu, void* srcGpu, size_t size, GpuResult* result) {
 	GpuResult localResult;
@@ -376,7 +376,7 @@ void mtl4ReleaseCommandBufferResources(Mtl4CommandBuffer handle) {
 	}
 }
 
-void mtl4SubmitSingleBuffer(GpuQueue queue, GpuCommandBuffer commandBuffer, Mtl4SemaphoreMetadata* semaphore, uint64_t value, GpuResult* result) {
+void mtl4SubmitSingleBuffer(GpuQueue queue, GpuCommandBuffer commandBuffer, id<MTLSharedEvent> event, uint64_t value, GpuResult* result) {
 	(void)queue;
 
 	Mtl4CommandBuffer handle = mtl4GpuCommandBufferToHandle(commandBuffer);
@@ -402,8 +402,8 @@ void mtl4SubmitSingleBuffer(GpuQueue queue, GpuCommandBuffer commandBuffer, Mtl4
 
 	[metadata->queue commit:&metadata->commandBuffer count:1];
 
-	if (semaphore != nullptr) {
-		[metadata->queue signalEvent:semaphore->event value:value];
+	if (event != nil) {
+		[metadata->queue signalEvent:event value:value];
 	}
 
 	uint64_t submitCount = cmnAtomicLoad(&gMtl4CommandBufferStorage.submitCount);

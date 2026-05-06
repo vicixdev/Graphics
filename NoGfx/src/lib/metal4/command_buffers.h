@@ -5,7 +5,6 @@
 #include <lib/common/static_handle_map.h>
 #include <lib/metal4/pipelines.h>
 #include <lib/metal4/queue.h>
-#include <lib/metal4/semaphores.h>
 
 #include <gpu/gpu.h>
 #include <Metal/Metal.h>
@@ -15,6 +14,8 @@
 
 #define MTL4_COMMANDBUFFER_INTERNAL_MEMORY_SIZE 512 * 1024
 #define MTL4_MAX_PARALLEL_COMMANDBUFFER_ENCODINGS 16
+
+struct Mtl4SemaphoreMetadata;
 
 typedef CmnHandle Mtl4CommandBuffer;
 
@@ -119,7 +120,7 @@ bool mtl4AcquireResourcesForNewCommandBuffer(Mtl4CommandBuffer* handle, id<MTL4C
 void mtl4ReleaseCommandBufferResources(Mtl4CommandBuffer handle);
 bool mtl4IsCommandBufferScheduledForDeletion(Mtl4CommandBuffer commandBuffer);
 
-void mtl4SubmitSingleBuffer(GpuQueue queue, GpuCommandBuffer commandBuffer, Mtl4SemaphoreMetadata* semaphore, uint64_t value, GpuResult* result);
+void mtl4SubmitSingleBuffer(GpuQueue queue, GpuCommandBuffer commandBuffer, id<MTLSharedEvent> event, uint64_t value, GpuResult* result);
 
 bool mtl4IsStageCompute(GpuStage stage);
 bool mtl4IsStageRender(GpuStage stage);

@@ -5,11 +5,14 @@
 #include <Metal/Metal.h>
 #include <lib/common/page.h>
 #include <lib/common/storage_sync.h>
+#include <lib/metal4/command_buffers.h>
 
 typedef CmnHandle Mtl4Semaphore;
 
 typedef struct Mtl4SemaphoreMetadata {
-	id<MTLSharedEvent> event;
+	id<MTLSharedEvent>	events	[MTL4_MAX_PARALLEL_COMMANDBUFFER_ENCODINGS];
+	size_t	lastSignalCount;
+	CmnMutex mutex;
 } Mtl4SemaphoreMetadata;
 
 typedef struct Mtl4SemaphoreStorage {
@@ -27,7 +30,6 @@ void mtl4FiniSemaphoreStorage(void);
 
 GpuSemaphore mtl4CreateSemaphore(uint64_t value, GpuResult* result);
 void mtl4WaitSemaphore(GpuSemaphore sema, uint64_t value, GpuResult* result);
-void mtl4SignalValue(GpuSemaphore sema, uint64_t value, GpuResult* result);
 void mtl4DestroySemaphore(GpuSemaphore sema);
 
 inline GpuSemaphore mtl4HandleToGpuSemaphore(Mtl4Semaphore handle) {

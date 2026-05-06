@@ -1,7 +1,6 @@
 #include <stdio.h>
 #include <string.h>
 #include <gpu/gpu.h>
-#include <unistd.h>
 
 GpuBackend selectBackend(void) {
 	#ifdef __APPLE__
@@ -90,23 +89,15 @@ int main(void) {
 	gpuMemCpy(commandBuffer, privateBuffer, (float*)privateBuffer + 4, sizeof(float), NULL);
 	gpuSignalAfter(commandBuffer, GPU_STAGE_TRANSFER, deviceSignal, 42, GPU_SIGNAL_ATOMIC_MAX, NULL);
 
-	// gpuWaitBefore(commandBuffer, GPU_STAGE_TRANSFER, deviceSignal, 42, GPU_OP_GREATER_EQUAL, GPU_HAZARD_NONE, -1, NULL);
-	// gpuMemCpy(commandBuffer, deviceDownloadBuffer, privateBuffer, sizeof(data), NULL);
-
 	gpuWaitBefore(commandBuffer2, GPU_STAGE_TRANSFER, deviceSignal, 42, GPU_OP_GREATER_EQUAL, GPU_HAZARD_NONE, -1, NULL);
-	// gpuBarrier(commandBuffer, GPU_STAGE_TRANSFER, GPU_STAGE_TRANSFER, GPU_HAZARD_NONE, NULL);
 	gpuMemCpy(commandBuffer2, deviceDownloadBuffer, privateBuffer, sizeof(data), NULL);
-	gpuSignalAfter(commandBuffer, GPU_STAGE_TRANSFER, deviceSignal, 43, GPU_SIGNAL_ATOMIC_MAX, NULL);
-	// gpuMemCpy(commandBuffer2, deviceSignal, privateBuffer, sizeof(float), NULL);
 
-	GpuCommandBuffer commandBuffers[2] = {commandBuffer, commandBuffer2};
+	// The order does not change the behaviour...
+	GpuCommandBuffer commandBuffers[2] = { commandBuffer, commandBuffer2 };
 	// GpuCommandBuffer commandBuffers[2] = {commandBuffer2, commandBuffer};
 	gpuSubmitWithSignal(queue, commandBuffers, 2, semaphore, 1, NULL);
-	// gpuSubmitWithSignal(queue, commandBuffers, 1, semaphore, 1, NULL);
-	// gpuSubmitWithSignal(queue, &commandBuffer, 1, semaphore, 1, NULL);
-	gpuWaitSemaphore(semaphore, 1, NULL);
 
-	usleep(1000000);
+	gpuWaitSemaphore(semaphore, 1, NULL);
 
 	printf("Downloaded data: ");
 	for (size_t i = 0; i < sizeof(data) / sizeof(*data); i++) {
