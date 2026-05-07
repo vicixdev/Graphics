@@ -9,6 +9,9 @@ GpuBackend selectBackend(void) {
 	#endif
 }
 
+// extern "C" void __Z10mtl4Deinitv(void);
+extern void mtl4Deinit(void);
+
 int main(void) {
 	GpuInitDesc desc;
 	desc.backend		= selectBackend();
@@ -18,6 +21,8 @@ int main(void) {
 	desc.extraLayerCount	= 0;
 
 	GpuResult result = GPU_SUCCESS;
+
+	mtl4Deinit();
 
 	gpuInit(&desc, &result);
 	if (result != GPU_SUCCESS) {

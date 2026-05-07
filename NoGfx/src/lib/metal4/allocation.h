@@ -132,6 +132,7 @@ typedef struct Mtl4AllocationStorage {
 	CmnArena	miscArena;
 
 	id<MTLResidencySet>	residencySet;
+	CmnMutex	residencySetMutex;
 
 	// Contains a direct mapping for addresses of GPU_MEMORY_DEFAULT or GPU_MEMORY_READBACK allocations.
 	// Used for fast lookups, but does not support addresses with offsets.
@@ -204,6 +205,9 @@ bool mtl4IsAllocationScheduledForDeletion(void* ptr);
 
 // NOTE: Requires a deletion lock in gMtl4AllocationStorage.sync
 void mtl4DestroyAllocation(Mtl4AllocationHandle handle);
+
+void mtl4AddAllocationToResidencySet(id<MTLAllocation> allocation);
+void mtl4RemoveAllocationToResidencySet(id<MTLAllocation> allocation);
 
 // NOTE: This is an HACK, since eq and cmp are not symmetrical. This works because the implementation of BTree always
 //	compares keys and values with the same order: keys on the right, values on the left.

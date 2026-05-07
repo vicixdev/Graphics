@@ -64,7 +64,6 @@ GpuTexture mtl4CreateTexture(const GpuTextureDesc* desc, void* ptrGpu, GpuResult
 	
 	MTLTextureDescriptor* textureDescriptor = mtl4GpuTextureDescToMtl(
 		desc,
-		// MTLResourceStorageModePrivate | MTLResourceHazardTrackingModeUntracked
 		MTLResourceStorageModePrivate
 	);
 	defer ([textureDescriptor release]);
@@ -75,58 +74,46 @@ GpuTexture mtl4CreateTexture(const GpuTextureDesc* desc, void* ptrGpu, GpuResult
 	if (backingHeap == nil) {
 		GpuTextureSizeAlign expectedSizeAlign = mtl4TextureSizeAlign(desc, nullptr);
 
-		if (offsetFromBase == 0 && expectedSizeAlign.size == metadata->size) {
-			// The buffer has been made to contain only the texture;
-
-			texture = [gMtl4Context.device newTextureWithDescriptor:textureDescriptor];
-			if (texture == nil) {
-				CMN_SET_RESULT(result, GPU_OUT_OF_GPU_MEMORY);
-				return 0;
-			}
-
-			cmnAtomicOr(&metadata->internalUsage, (Mtl4InternalAllocationUsages)MTL4_ALLOCATION_FOR_SINGLE_TEXTURE);
-		} else if (
-			cmnIsAlignedTo((uintptr_t)ptrGpu, expectedSizeAlign.align) &&
-			(metadata->size - offsetFromBase) >= expectedSizeAlign.size
+		if (
+			!cmnIsAlignedTo((uintptr_t)ptrGpu, expectedSizeAlign.align) ||
+			(metadata->size - offsetFromBase) < expectedSizeAlign.size
 		) {
-			// The buffer must contain a new heap, for multiple textures
-			MTLHeapDescriptor* heapDescriptor = [MTLHeapDescriptor new];
-			defer ([heapDescriptor release]);
+			CMN_SET_RESULT(result, GPU_OUT_OF_GPU_MEMORY);
+			return 0;
+		}
 
-			// heapDescriptor.resourceOptions = MTLResourceStorageModePrivate | MTLResourceHazardTrackingModeUntracked;
-			heapDescriptor.resourceOptions = MTLResourceStorageModePrivate;
-			heapDescriptor.size = metadata->size;
+		// The buffer must contain a new heap, for multiple textures
+		MTLHeapDescriptor* heapDescriptor = [MTLHeapDescriptor new];
+		defer ([heapDescriptor release]);
 
-			backingHeap = [gMtl4Context.device newHeapWithDescriptor:heapDescriptor];
-			if (backingHeap == nil) {
-				CMN_SET_RESULT(result, GPU_OUT_OF_GPU_MEMORY);
-				return 0;
-			}
+		// heapDescriptor.resourceOptions = MTLResourceStorageModePrivate | MTLResourceHazardTrackingModeUntracked;
+		heapDescriptor.resourceOptions = MTLResourceStorageModePrivate;
+		heapDescriptor.size = metadata->size;
 
-			// NOTE: Another thread may have got here before us. If so, let's use the heap set by the other
-			//	thread.
-			if (!cmnAtomicCompareExchangeStrong(&metadata->associatedTextureHeap, (id<MTLHeap>)nil, backingHeap)) {
-				[backingHeap release];
-				backingHeap = cmnAtomicLoad(&metadata->associatedTextureHeap);
-			}
+		backingHeap = [gMtl4Context.device newHeapWithDescriptor:heapDescriptor];
+		if (backingHeap == nil) {
+			CMN_SET_RESULT(result, GPU_OUT_OF_GPU_MEMORY);
+			return 0;
+		}
 
-			[gMtl4AllocationStorage.residencySet addAllocation:backingHeap];
+		// NOTE: Another thread may have got here before us. If so, let's use the heap set by the other
+		//	thread.
+		if (!cmnAtomicCompareExchangeStrong(&metadata->associatedTextureHeap, (id<MTLHeap>)nil, backingHeap)) {
+			[backingHeap release];
+			backingHeap = cmnAtomicLoad(&metadata->associatedTextureHeap);
+		}
 
-			texture = [backingHeap newTextureWithDescriptor:textureDescriptor];
-			if (texture == nil) {
-				[backingHeap release];
+		mtl4AddAllocationToResidencySet(backingHeap);
 
-				CMN_SET_RESULT(result, GPU_OUT_OF_GPU_MEMORY);
-				return 0;
-			}
-
-			cmnAtomicOr(&metadata->internalUsage, (Mtl4InternalAllocationUsages)MTL4_ALLOCATION_FOR_TEXTURE_HEAP);
-		} else {
-			// The buffer is not big enough
+		texture = [backingHeap newTextureWithDescriptor:textureDescriptor];
+		if (texture == nil) {
+			[backingHeap release];
 
 			CMN_SET_RESULT(result, GPU_OUT_OF_GPU_MEMORY);
 			return 0;
 		}
+
+		cmnAtomicOr(&metadata->internalUsage, (Mtl4InternalAllocationUsages)MTL4_ALLOCATION_FOR_TEXTURE_HEAP);
 
 	} else {
 		texture = [backingHeap newTextureWithDescriptor:textureDescriptor];

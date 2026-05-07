@@ -91,11 +91,6 @@ GpuCommandBuffer mtl4StartCommandEncoding(GpuQueue queue, GpuResult* result) {
 	metadata->submitEvent = submitEvent;
 	metadata->commandAllocator = mtlAllocator;
 
-	metadata->commandBuffer = [gMtl4Context.device newCommandBuffer];
-	[metadata->commandBuffer beginCommandBufferWithAllocator:mtlAllocator];
-
-	metadata->computeEncoder = [metadata->commandBuffer computeCommandEncoder];
-
 	uint64_t submitCount = cmnAtomicLoad(&gMtl4CommandBufferStorage.submitCount);
 	[metadata->queue waitForEvent:submitEvent value:submitCount];
 
@@ -164,6 +159,7 @@ void mtl4MemCpy(GpuCommandBuffer cb, void* destGpu, void* srcGpu, size_t size, G
 		return;
 	}
 
+	mtl4EnsureValidComputeEndoderFor(metadata);
 	[metadata->computeEncoder
 	 	copyFromBuffer:sourceMetadata->buffer sourceOffset:source.offset
 		toBuffer:destinationMetadata->buffer destinationOffset:destination.offset
@@ -217,6 +213,7 @@ void mtl4CopyToTexture(GpuCommandBuffer cb, void* destGpu, void* srcGpu, GpuText
 				gMtl4GpuFormatPixelSize[textureMetadata->descriptor.format];
 
 	// TODO: Support mipmaps.
+	mtl4EnsureValidComputeEndoderFor(metadata);
 	[metadata->computeEncoder copyFromBuffer:sourceMetadata->buffer
 	 	sourceOffset:source.offset
 		sourceBytesPerRow:bytesPerRow
@@ -275,6 +272,7 @@ void mtl4CopyFromTexture(GpuCommandBuffer cb, void* destGpu, void* srcGpu, GpuTe
 				gMtl4GpuFormatPixelSize[textureMetadata->descriptor.format];
 
 	// TODO: Support mipmaps.
+	mtl4EnsureValidComputeEndoderFor(metadata);
 	[metadata->computeEncoder copyFromTexture:textureMetadata->texture
 		sourceSlice:0
 		sourceLevel:0
@@ -303,18 +301,15 @@ void mtl4Barrier(GpuCommandBuffer cb, GpuStage before, GpuStage after, GpuHazard
 	// TODO: Figure out render stuff...
 
 	if (mtl4IsStageCompute(before)) {
-		[metadata->computeEncoder endEncoding];
-		metadata->computeEncoder = [metadata->commandBuffer computeCommandEncoder];
-	}
-	if (mtl4IsStageRender(before)) {
-		assert(false && "Unimplemented.");
+		mtl4FlushCommandEncoderOf(metadata);
 	}
 
 	if (mtl4IsStageCompute(after)) {
-		[metadata->computeEncoder barrierAfterQueueStages:metalBefore beforeStages:metalAfter visibilityOptions:metalVisibilityOptions];
-	}
-	if (mtl4IsStageRender(after)) {
-		assert(false && "Unimplemented.");
+		mtl4EnsureValidComputeEndoderFor(metadata);
+		[metadata->computeEncoder
+			barrierAfterQueueStages:metalBefore
+			beforeStages:metalAfter & (MTLStageBlit | MTLStageDispatch)
+			visibilityOptions:metalVisibilityOptions];
 	}
 
 	CMN_SET_RESULT(result, GPU_SUCCESS);
@@ -376,6 +371,50 @@ void mtl4ReleaseCommandBufferResources(Mtl4CommandBuffer handle) {
 	}
 }
 
+void mtl4EnsureValidCommandBuffer(Mtl4CommandBufferMetadata* metadata) {
+	if (metadata->commandBuffer == nil) {
+		metadata->commandBuffer = [gMtl4Context.device newCommandBuffer];
+		[metadata->commandBuffer beginCommandBufferWithAllocator:metadata->commandAllocator];
+	}
+}
+
+void mtl4EnsureValidComputeEndoderFor(Mtl4CommandBufferMetadata* metadata) {
+	mtl4EnsureValidCommandBuffer(metadata);
+	if (metadata->computeEncoder == nil) {
+		metadata->computeEncoder = [metadata->commandBuffer computeCommandEncoder];
+	}
+}
+
+void mtl4FlushCommandEncoderOf(Mtl4CommandBufferMetadata* metadata) {
+	if (metadata->computeEncoder != nil) {
+		[metadata->computeEncoder endEncoding];
+		metadata->computeEncoder = nil;
+	}
+}
+
+void mtl4FlushCommandBuffer(Mtl4CommandBufferMetadata* metadata) {
+	if (metadata->commandBuffer == nil) {
+		return;
+	}
+
+	mtl4FlushCommandEncoderOf(metadata);
+	[metadata->commandBuffer endCommandBuffer];
+
+	[metadata->queue commit:&metadata->commandBuffer count:1];
+
+	[metadata->commandBuffer release];
+	metadata->commandBuffer = nil;
+}
+
+void mtl4StartCommandBufferExecution(Mtl4CommandBufferMetadata* metadata) {
+	assert(metadata->status == MTL4_COMMAND_BUFFER_SUBMITTED);
+
+	uint64_t submitCount = cmnAtomicLoad(&gMtl4CommandBufferStorage.submitCount);
+	[metadata->submitEvent setSignaledValue:submitCount];
+
+	cmnAtomicAdd(&gMtl4CommandBufferStorage.submitCount, 1ULL);
+}
+
 void mtl4SubmitSingleBuffer(GpuQueue queue, GpuCommandBuffer commandBuffer, id<MTLSharedEvent> event, uint64_t value, GpuResult* result) {
 	(void)queue;
 
@@ -392,190 +431,14 @@ void mtl4SubmitSingleBuffer(GpuQueue queue, GpuCommandBuffer commandBuffer, id<M
 		return;
 	}
 
-	if (metadata->computeEncoder != nil) {
-		[metadata->computeEncoder endEncoding];
-	}
-	if (metadata->renderEncoder != nil) {
-		[metadata->renderEncoder endEncoding];
-	}
-	[metadata->commandBuffer endCommandBuffer];
-
-	[metadata->queue commit:&metadata->commandBuffer count:1];
-
+	mtl4FlushCommandBuffer(metadata);
 	if (event != nil) {
 		[metadata->queue signalEvent:event value:value];
 	}
-
-	uint64_t submitCount = cmnAtomicLoad(&gMtl4CommandBufferStorage.submitCount);
-	[metadata->submitEvent setSignaledValue:submitCount];
-
-	cmnAtomicAdd(&gMtl4CommandBufferStorage.submitCount, 1ULL);
-
-	[metadata->commandBuffer release];
+	mtl4StartCommandBufferExecution(metadata);
 
 	mtl4ReleaseCommandBufferResources(handle);
 }
-
-// void mtl4SubmitRaw(
-// 	GpuQueue queue,
-// 	GpuCommandBuffer* commandBuffers,
-// 	size_t commandBufferCount,
-// 	GpuSemaphore semaphore,
-// 	uint64_t value,
-// 	GpuResult* result
-// ) {
-// 	(void)queue;
-
-// 	CmnResult localResult;
-
-// 	CMN_SET_RESULT(result, GPU_SUCCESS);
-
-// 	id<MTL4CommandQueue> metalQueue = mtl4Queue();
-
-// 	// TODO: Switch thread local arena.
-// 	id<MTL4CommandBuffer>* metalCommandBuffers = cmnHeapAlloc<id<MTL4CommandBuffer>>(commandBufferCount + 1, &localResult);
-// 	defer (cmnHeapFree(metalCommandBuffers));
-// 	size_t validCommandBufferCount = 0;
-
-// 	for (size_t i = 0; i < commandBufferCount; i++) {
-// 		GpuCommandBuffer commandBuffer = commandBuffers[i];
-// 		Mtl4CommandBuffer commandBufferHandle = mtl4GpuCommandBufferToHandle(commandBuffer);
-
-// 		Mtl4CommandBufferMetadata* metadata = mtl4AcquireCommandBufferMetadataFrom(commandBufferHandle);
-// 		if (metadata == nullptr) {
-// 			CMN_SET_RESULT(result, GPU_NO_SUCH_COMMAND_BUFFER_FOUND);
-// 			continue;
-// 		}
-// 		defer (mtl4ReleaseCommandBufferMetadata());
-
-// 		if (metadata->status != MTL4_COMMAND_BUFFER_ENCODING) {
-// 			CMN_SET_RESULT(result, GPU_USE_AFTER_FREE);
-// 			continue;
-// 		}
-// 		metadata->status = MTL4_COMMAND_BUFFER_SUBMITTED;
-
-// 		[metadata->computeEncoder endEncoding];
-// 		[metadata->commandBuffer endCommandBuffer];
-
-// 		metalCommandBuffers[validCommandBufferCount] = metadata->commandBuffer;
-// 		validCommandBufferCount++;
-// 	}
-
-// 	if (validCommandBufferCount > 0) {
-// 		[metalQueue addResidencySet:gMtl4AllocationStorage.residencySet];
-// 		[metalQueue commit:metalCommandBuffers count:validCommandBufferCount];
-// 	}
-
-// 	if (semaphore != 0) {
-// 		Mtl4Semaphore semaphoreHandle = mtl4GpuSemaphoreToHandle(semaphore);
-// 		Mtl4SemaphoreMetadata* metadata = mtl4AcquireSemaphoreMetadataFrom(semaphoreHandle);
-// 		if (metadata == nullptr) {
-// 			CMN_SET_RESULT(result, GPU_NO_SUCH_SEMAPHORE_FOUND);
-// 			return;
-// 		}
-// 		defer (mtl4ReleaseSemaphoreMetadata());
-
-// 		[metalQueue signalEvent:metadata->event value:value];
-// 	}
-
-// 	// NOTE: Result here is GPU_SUCCESS if all the command buffers were valid.
-// 	return;
-// }
-
-// void mtl4Submit(GpuQueue queue, GpuCommandBuffer* commandBuffers, size_t commandBufferCount, GpuResult* result) {
-// 	mtl4SubmitRaw(queue, commandBuffers, commandBufferCount, 0, 0, result);
-// }
-
-// void mtl4SubmitWithSignal(
-// 	GpuQueue queue,
-// 	GpuCommandBuffer* commandBuffers,
-// 	size_t commandBufferCount,
-// 	GpuSemaphore semaphore,
-// 	uint64_t value,
-// 	GpuResult* result
-// ) {
-// 	mtl4SubmitRaw(queue, commandBuffers, commandBufferCount, semaphore, value, result);
-// }
-
-
-// void mtl4SetActiveTextureHeapPtr(GpuCommandBuffer cb, void *ptrGpu, GpuResult* result) {
-// 	Mtl4CommandBuffer handle = mtl4GpuCommandBufferToHandle(cb);
-// 	Mtl4CommandBufferMetadata* metadata = mtl4AcquireCommandBufferMetadataFrom(handle);
-// 	if (metadata == nullptr) {
-// 		CMN_SET_RESULT(result, GPU_NO_SUCH_COMMAND_BUFFER_FOUND);
-// 		return;
-// 	}
-// 	defer (mtl4ReleaseCommandBufferMetadata());
-
-// 	CMN_SET_RESULT(result, GPU_SUCCESS);
-// 	// metadata->boundTextureHeap = ptrGpu;
-// }
-
-// Mtl4CommandBuffer mtl4CreateCommandBuffer(GpuResult* result) {
-// 	CmnResult localResult;
-
-// 	Mtl4CommandBufferMetadata metadata = {};
-
-// 	metadata.commandBuffer = [gMtl4Context.device newCommandBuffer];
-// 	if (metadata.commandBuffer == nil) {
-// 		CMN_SET_RESULT(result, GPU_COUND_NOT_CREATE_COMMAND_BUFFER);
-// 		return {};
-// 	}
-
-// 	id<MTL4CommandAllocator> commandAllocator = [gMtl4Context.device newCommandAllocator];
-// 	[metadata.commandBuffer beginCommandBufferWithAllocator:commandAllocator];
-
-// 	metadata.computeEncoder = [metadata.commandBuffer computeCommandEncoder];
-// 	if (metadata.computeEncoder == nil) {
-// 		[metadata.commandBuffer endCommandBuffer];
-// 		[metadata.commandBuffer release];
-
-// 		CMN_SET_RESULT(result, GPU_COUND_NOT_CREATE_COMMAND_BUFFER);
-// 		return {};
-// 	}
-
-// 	{
-// 		CmnScopedStorageSyncLockWrite guard(&gMtl4CommandBufferStorage.sync);
-
-// 		Mtl4CommandBuffer handle = cmnInsert(&gMtl4CommandBufferStorage.commandBuffers, metadata, &localResult);
-// 		if (localResult != CMN_SUCCESS) {
-// 			[metadata.computeEncoder release];
-// 			[metadata.commandBuffer endCommandBuffer];
-// 			[metadata.commandBuffer release];
-
-// 			CMN_SET_RESULT(result, GPU_OUT_OF_CPU_MEMORY);
-// 			return {};
-// 		}
-
-// 		CMN_SET_RESULT(result, GPU_SUCCESS);
-// 		return handle;
-// 	}
-// }
-
-// void mtl4DestroyCommandBuffer(Mtl4CommandBuffer commandBuffer) {
-// 	bool wasHandleValid;
-// 	Mtl4CommandBufferMetadata* metadata = &cmnGet(&gMtl4CommandBufferStorage.commandBuffers, commandBuffer, &wasHandleValid);
-// 	if (!wasHandleValid) {
-// 		return;
-// 	}
-
-// 	if (metadata->status != MTL4_COMMAND_BUFFER_SUBMITTED) {
-// 		return;
-// 	}
-
-// 	[metadata->commandBuffer release];
-
-// 	cmnRemove(&gMtl4CommandBufferStorage.commandBuffers, commandBuffer);
-// }
-
-// bool mtl4IsCommandBufferScheduledForDeletion(Mtl4CommandBuffer commandBuffer) {
-// 	Mtl4CommandBufferMetadata* metadata = mtl4AcquireCommandBufferMetadataFrom(commandBuffer);
-// 	if (metadata == nil) {
-// 		return false;
-// 	}
-
-// 	return metadata->status == MTL4_COMMAND_BUFFER_SUBMITTED;
-// }
 
 bool mtl4IsStageCompute(GpuStage stage) {
 	return GPU_STAGE_COMPUTE & stage || GPU_STAGE_TRANSFER & stage;

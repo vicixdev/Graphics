@@ -9,10 +9,6 @@
 #include <gpu/gpu.h>
 #include <Metal/Metal.h>
 
-// NOTE: Make a single pool element fit in 2 cache lines
-#define MTL4_COMMANDBUFFERSTORAGE_POOLSIZE 256
-
-#define MTL4_COMMANDBUFFER_INTERNAL_MEMORY_SIZE 512 * 1024
 #define MTL4_MAX_PARALLEL_COMMANDBUFFER_ENCODINGS 16
 
 struct Mtl4SemaphoreMetadata;
@@ -24,41 +20,9 @@ typedef enum Mtl4CommandBufferStatus {
 	MTL4_COMMAND_BUFFER_SUBMITTED,
 } Mtl4CommandBufferStatus;
 
-// typedef enum Mtl4EncodedCommandType {
-// 	MTL4_COMMAND_COMMIT_TO_QUEUE,
-// 	MTL4_COMMAND_SIGNAL_EVENT,
-// 	MTL4_COMMAND_WAIT_EVENT,
-// } Mtl4EncodedCommandType;
-
-// typedef struct Mtl4EncodedCommandCommit {
-// 	id<MTL4CommandBuffer> commandBuffer;
-// } Mtl4CommitEncodedCommand;
-
-// typedef struct Mtl4EncodedCommandSignalEvent {
-// 	id<MTLEvent>	event;
-// 	uint64_t	value;
-// } Mtl4EncodedCommandSignalEvent;
-
-// typedef struct Mtl4EncodedCommandWaitEvent {
-// 	id<MTLEvent>	event;
-// 	uint64_t	value;
-// } Mtl4EncodedCommandWaitEvent;
-
-// typedef struct Mtl4EncodedCommand {
-// 	Mtl4EncodedCommandType	type;
-// 	union {
-// 		Mtl4EncodedCommandCommit	commit;
-// 		Mtl4EncodedCommandSignalEvent	signal;
-// 		Mtl4EncodedCommandWaitEvent	wait;
-// 	};
-// } Mtl4EncodedCommand;
-
 // NOTE: Encoding a command encoder is not thread safe: It can happen from any thread, but sequential encoding
 //	is expected. The synchronization is thus expected from the user.
 typedef struct Mtl4CommandBufferMetadata {
-	// // Arena of 512 KB. Allocated from gMlt4CommandBufferStorage.commandBuffersMemoryPool
-	// CmnArena	arena;
-
 	Mtl4CommandBufferStatus	status;
 
 	id<MTL4CommandQueue>		queue;
@@ -68,17 +32,9 @@ typedef struct Mtl4CommandBufferMetadata {
 	id<MTL4CommandBuffer>		commandBuffer;
 	id<MTL4ComputeCommandEncoder>	computeEncoder;
 	id<MTL4RenderCommandEncoder>	renderEncoder;
-
-	// NOTE: Enough space for 128 encoded commands
-	// CmnExponentialArray<Mtl4EncodedCommand, 4, 4>	encodedCommands;
 } Mtl4CommandBufferMetadata;
 
 typedef struct Mtl4CommandBufferStorage {
-	// CmnPage		commandBufferMemory;
-	// // NOTE: Each command buffer acquires 512 KB for temporary data encoding.
-	// //	The pool consists of slots of 512 KB.
-	// CmnPool		commandBufferMemoryPool;
-
 	id<MTLSharedEvent>		submitEvents[MTL4_MAX_PARALLEL_COMMANDBUFFER_ENCODINGS];
 	id<MTL4CommandAllocator>	commandAllocators[MTL4_MAX_PARALLEL_COMMANDBUFFER_ENCODINGS];
 	id<MTL4CommandQueue>		queues[MTL4_MAX_PARALLEL_COMMANDBUFFER_ENCODINGS];
@@ -120,7 +76,12 @@ bool mtl4AcquireResourcesForNewCommandBuffer(Mtl4CommandBuffer* handle, id<MTL4C
 void mtl4ReleaseCommandBufferResources(Mtl4CommandBuffer handle);
 bool mtl4IsCommandBufferScheduledForDeletion(Mtl4CommandBuffer commandBuffer);
 
+void mtl4EnsureValidCommandBuffer(Mtl4CommandBufferMetadata* metadata);
+void mtl4EnsureValidComputeEndoderFor(Mtl4CommandBufferMetadata* metadata);
+void mtl4FlushCommandEncoderOf(Mtl4CommandBufferMetadata* metadata);
+void mtl4FlushCommandBuffer(Mtl4CommandBufferMetadata* metadata);
 void mtl4SubmitSingleBuffer(GpuQueue queue, GpuCommandBuffer commandBuffer, id<MTLSharedEvent> event, uint64_t value, GpuResult* result);
+void mtl4StartCommandBufferExecution(Mtl4CommandBufferMetadata* metadata);
 
 bool mtl4IsStageCompute(GpuStage stage);
 bool mtl4IsStageRender(GpuStage stage);

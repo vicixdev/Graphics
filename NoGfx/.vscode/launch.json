@@ -10,7 +10,10 @@
             "name": "Test",
             "program": "${workspaceFolder}/build/test",
             "args": [],
-            "cwd": "${workspaceFolder}"
+            "cwd": "${workspaceFolder}",
+            "env": {
+                "MTL_DEBUG_LAYER": "1",
+            }
         },
         {
             "type": "lldb",

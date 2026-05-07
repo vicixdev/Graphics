@@ -175,11 +175,8 @@ void mtl4SignalEvent(
 
 	size_t fenceUploadValueOffset = mtl4UploadFenceValue(value);
 
-	if ([commandBuffer->computeEncoder stages] != 0) {
-		[commandBuffer->computeEncoder endEncoding];
-		commandBuffer->computeEncoder = [commandBuffer->commandBuffer computeCommandEncoder];
-	}
-
+	mtl4FlushCommandEncoderOf(commandBuffer);
+	mtl4EnsureValidComputeEndoderFor(commandBuffer);
 	[commandBuffer->computeEncoder barrierAfterQueueStages:MTLStageAll beforeStages:MTLStageBlit visibilityOptions:MTL4VisibilityOptionDevice | MTL4VisibilityOptionResourceAlias];
 	[commandBuffer->computeEncoder
 		copyFromBuffer:gMtl4EventStorage.signaledValuesUploadBuffer
@@ -187,16 +184,9 @@ void mtl4SignalEvent(
 		toBuffer:allocation->buffer
 		destinationOffset:gpuPtrOffsetFromBase
 		size:sizeof(uint64_t)];
-	[commandBuffer->computeEncoder endEncoding];
-	[commandBuffer->commandBuffer endCommandBuffer];
 
-	[commandBuffer->queue commit:&commandBuffer->commandBuffer count:1];
+	mtl4FlushCommandBuffer(commandBuffer);
 	[commandBuffer->queue signalEvent:event value:value];
-	[commandBuffer->commandBuffer release];
-
-	commandBuffer->commandBuffer = [gMtl4Context.device newCommandBuffer];
-	[commandBuffer->commandBuffer beginCommandBufferWithAllocator:commandBuffer->commandAllocator];
-	commandBuffer->computeEncoder = [commandBuffer->commandBuffer computeCommandEncoder];
 }
 
 
@@ -218,21 +208,8 @@ void mtl4WaitEvent(
 	}
 	defer (mtl4ReleaseEvent());
 
-	if (commandBuffer->computeEncoder != nil) {
-		[commandBuffer->computeEncoder endEncoding];
-	}
-	// if (commandBuffer->renderEncoder != nil) {
-	// 	[commandBuffer->renderEncoder endEncoding];
-	// }
-	[commandBuffer->commandBuffer endCommandBuffer];
-
+	mtl4FlushCommandBuffer(commandBuffer);
 	[commandBuffer->queue waitForEvent:event value:value];
-	[commandBuffer->queue commit:&commandBuffer->commandBuffer count:1];
-	[commandBuffer->commandBuffer release];
-
-	commandBuffer->commandBuffer = [gMtl4Context.device newCommandBuffer];
-	[commandBuffer->commandBuffer beginCommandBufferWithAllocator:commandBuffer->commandAllocator];
-	commandBuffer->computeEncoder = [commandBuffer->commandBuffer computeCommandEncoder];
 
 	CMN_SET_RESULT(result, GPU_SUCCESS);
 }

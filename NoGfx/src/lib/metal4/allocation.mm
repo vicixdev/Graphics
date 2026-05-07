@@ -108,7 +108,7 @@ id<MTLBuffer> mtl4AllocateBuffer(size_t size, size_t align, GpuMemory memory, Gp
 		return nil;
 	}
 
-	[gMtl4AllocationStorage.residencySet addAllocation:buffer];
+	mtl4AddAllocationToResidencySet(buffer);
 
 	CMN_SET_RESULT(result, GPU_SUCCESS);
 	return buffer;
@@ -481,7 +481,7 @@ void mtl4EnsureBackingBufferIsAllocated(Mtl4AllocationMetadata* metadata, GpuRes
 
 	// NOTE: Another thread could have set this up before us. If so, let's use the other thread buffer.
 	if (!cmnAtomicCompareExchangeStrong(&metadata->buffer, (id<MTLBuffer>)nil, buffer)) {
-		[gMtl4AllocationStorage.residencySet removeAllocation:buffer];
+		mtl4RemoveAllocationToResidencySet(buffer);
 		[buffer release];
 	}
 
@@ -557,17 +557,37 @@ void mtl4DestroyAllocation(Mtl4AllocationHandle handle) {
 
 	mtl4FreeAssociatedTextures(metadata);
 
-	[gMtl4AllocationStorage.residencySet removeAllocation:metadata->buffer];
-
-	if (metadata->buffer != nil) {
-		[metadata->buffer release];
+	if (metadata->associatedTextureHeap != nil) {
+		mtl4RemoveAllocationToResidencySet(metadata->associatedTextureHeap);
+		[metadata->associatedTextureHeap release];
 	}
 
-	[gMtl4AllocationStorage.residencySet removeAllocation:metadata->associatedTextureHeap];
-	[metadata->associatedTextureHeap release];
+	if (metadata->buffer != nil) {
+		mtl4RemoveAllocationToResidencySet(metadata->buffer);
+		[metadata->buffer release];
+	}
 
 	cmnRemove(&gMtl4AllocationStorage.cpuAddressRangeMap, range);
 	cmnRemove(&gMtl4AllocationStorage.cpuAllocationMap, (uintptr_t)ptr);
 	cmnRemove(&gMtl4AllocationStorage.gpuAllocationMap, metadata->assignedGpuAddress.allocationIdentifier);
 	cmnRemove(&gMtl4AllocationStorage.allocations, handle);
+}
+
+void mtl4AddAllocationToResidencySet(id<MTLAllocation> allocation) {
+	if (allocation == nil) {
+		return;
+	}
+
+	CmnScopedMutex guard(&gMtl4AllocationStorage.residencySetMutex);
+	[gMtl4AllocationStorage.residencySet addAllocation:allocation];
+}
+
+void mtl4RemoveAllocationToResidencySet(id<MTLAllocation> allocation) {
+	if (allocation == nil) {
+		return;
+	}
+
+	CmnScopedMutex guard(&gMtl4AllocationStorage.residencySetMutex);
+	[gMtl4AllocationStorage.residencySet removeAllocation:allocation];
+	
 }
