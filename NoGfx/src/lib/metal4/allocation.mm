@@ -166,6 +166,8 @@ void* mtl4Malloc(size_t size, size_t align, GpuMemory memory, GpuResult* result)
 		defer (if (failed) cmnRemove(&gMtl4AllocationStorage.cpuDirectLookup, metadata.cpuPtr));
 	}
 
+	mtl4AddAllocationToResidencySet(heap);
+
 	if (memory == GPU_MEMORY_GPU) {
 		CMN_SET_RESULT(result, GPU_SUCCESS);
 		return (void*)metadata.gpuPtr;
