@@ -146,11 +146,48 @@ typedef enum GpuSignal {
 	// ...
 } GpuSignal;
 
+typedef enum GpuTopology {
+	GPU_TOPOLOGY_TRIANGLE_LIST = 0,
+	GPU_TOPOLOGY_TRIANGLE_STRIP,
+	GPU_TOPOLOGY_TRIANGLE_FAN,
+} GpuTopology;
+
+typedef enum GpuCull {
+	GPU_CULL_CCW = 0,
+	GPU_CULL_CW,
+	GPU_CULL_ALL,
+	GPU_CULL_NONE,
+} GpuCull;
+
+typedef enum GpuDepthFlag {
+	GPU_DEPTH_READ = 0x1,
+	GPU_DEPTH_WRITE = 0x2
+} GpuDepthFlag;
+typedef size_t GpuDepthFlags; // bitfield of GpuDepthFlag
+
+typedef enum GpuBlend {
+	GPU_BLEND_ADD = 0,
+	GPU_BLEND_SUBTRACT,
+	GPU_BLEND_REV_SUBTRACT,
+	GPU_BLEND_MIN,
+	GPU_BLEND_MAX,
+} GpuBlend;
+
+typedef enum GpuFactor {
+	GPU_FACTOR_ZERO = 0,
+	GPU_FACTOR_ONE,
+	GPU_FACTOR_SRC_COLOR,
+	GPU_FACTOR_DST_COLOR,
+	GPU_FACTOR_SRC_ALPHA,
+} GpuFactor;
+
 #define GPU_DEFAULT_WAIT_MASK (~(uint64_t)0)
 
 typedef size_t GpuDeviceId;
 typedef uint64_t GpuTexture;
 typedef uint64_t GpuPipeline;
+typedef uint64_t GpuDepthStencilState;
+typedef uint64_t GpuBlendState;
 typedef uint64_t GpuQueue;
 typedef uint64_t GpuCommandBuffer;
 typedef uint64_t GpuSemaphore;
@@ -206,6 +243,54 @@ typedef struct GpuViewDesc {
 	uint16_t baseLayer;
 	uint16_t layerCount;
 } GpuViewDesc;
+
+typedef struct GpuStencil {
+	GpuOp test /* = OP_ALWAYS */;
+	GpuOp failOp /* = OP_KEEP */;
+	GpuOp passOp /* = OP_KEEP */;
+	GpuOp depthFailOp /* = OP_KEEP */;
+	uint8_t reference /* = 0 */;
+} GpuStencil;
+
+typedef struct GpuDepthStencilDesc {
+	GpuDepthFlags depthMode /* = 0 */;
+	GpuOp depthTest /* = OP_ALWAYS */;
+	float depthBias /* = 0.0f */;
+	float depthBiasSlopeFactor /* = 0.0f */;
+	float depthBiasClamp /* = 0.0f */;
+	uint8_t stencilReadMask /* = 0xff */;
+	uint8_t stencilWriteMask /* = 0xff */;
+	GpuStencil stencilFront;
+	GpuStencil stencilBack;
+} GpuDepthStencilDesc;
+
+typedef struct GpuBlendDesc {
+	GpuBlend colorOp /* = BLEND_ADD */;
+	GpuFactor srcColorFactor /* = FACTOR_ONE */;
+	GpuFactor dstColorFactor /* = FACTOR_ZERO */;
+	GpuBlend alphaOp /* = BLEND_ADD */;
+	GpuFactor srcAlphaFactor /* = FACTOR_ONE */;
+	GpuFactor dstAlphaFactor /* = FACTOR_ZERO */;
+	uint8_t colorWriteMask /* = 0xf */;
+} GpuBlendDesc;
+
+typedef struct GpuColorTarget {
+	GpuFormat format /* = GPU_FORMAT_NONE */;
+	uint8_t writeMask /* = 0xf */;
+} GpuColorTarget;
+
+typedef struct GpuRasterDesc {
+	GpuTopology topology /* = TOPOLOGY_TRIANGLE_LIST */;
+	GpuCull cull /* = CULL_NONE */;
+	bool alphaToCoverage /* = false */;
+	bool supportDualSourceBlending /* = false */;
+	uint8_t sampleCount /* = 1 */;
+	GpuFormat depthFormat /* = FORMAT_NONE */;
+	GpuFormat stencilFormat /* = FORMAT_NONE */;
+	GpuColorTarget* colorTargets /* = {} */;
+	GpuBlendDesc* blendstate /* = nullptr; */; // optional embedded blend state
+} GpuRasterDesc;
+
 
 struct GpuInitDesc;
 
@@ -318,6 +403,11 @@ GpuPipeline gpuCreateMeshletPipeline(
 );
 void gpuFreePipeline(GpuPipeline pipeline);
 
+GpuDepthStencilState gpuCreateDepthStencilState(const GpuDepthStencilDesc* desc, GpuResult* result);
+GpuBlendState gpuCreateBlendState(const GpuBlendDesc* desc, GpuResult* result);
+void gpuFreeDepthStencilState(GpuDepthStencilState state);
+void gpuFreeBlendState(GpuBlendState state);
+
 GpuQueue gpuCreateQueue(GpuResult* result);
 GpuCommandBuffer gpuStartCommandEncoding(GpuQueue queue, GpuResult* result);
 void gpuSubmit(GpuQueue queue, GpuCommandBuffer* commandBuffers, size_t commandBufferCount, GpuResult* result);
@@ -345,8 +435,8 @@ void gpuSignalAfter(GpuCommandBuffer cb, GpuStage before, void* ptrGpu, uint64_t
 void gpuWaitBefore(GpuCommandBuffer cb, GpuStage after, void* ptrGpu, uint64_t value, GpuOp op, GpuHazardFlags hazards, uint64_t mask, GpuResult* result);
 
 void gpuSetPipeline(GpuCommandBuffer cb, GpuPipeline pipeline, GpuResult* result);
-// void gpuSetDepthStencilState(GpuCommandBuffer cb, GpuDepthStencilState state);
-// void gpuSetBlendState(GpuCommandBuffer cb, GpuBlendState state); 
+void gpuSetDepthStencilState(GpuCommandBuffer cb, GpuDepthStencilState state, GpuResult* result);
+void gpuSetBlendState(GpuCommandBuffer cb, GpuBlendState state, GpuResult* result); 
 
 void gpuDispatch(GpuCommandBuffer cb, void* dataGpu, uint32_t gridDimensions[3], GpuResult* result);
 void gpuDispatchIndirect(GpuCommandBuffer cb, void* dataGpu, void* gridDimensionsGpu, GpuResult* result);

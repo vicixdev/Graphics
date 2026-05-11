@@ -299,7 +299,10 @@ Mtl4Function mtl4CreateFunction(Mtl4CompiledIr* function, const void* constants,
 		metadata.descriptor = baseDescriptor;
 	} else {
 		MTLFunctionConstantValues* constantValues = [MTLFunctionConstantValues new];
-		[constantValues setConstantValue:constants type:MTLDataTypeStruct atIndex:0];
+
+		for (size_t i = 0; i < (constantsSize / 8); i++) {
+			[constantValues setConstantValue:constants type:MTLDataTypeULong atIndex:i];
+		}
 
 		MTL4SpecializedFunctionDescriptor* functionDescriptor = [MTL4SpecializedFunctionDescriptor new];
 		functionDescriptor.functionDescriptor	= baseDescriptor;
