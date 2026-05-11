@@ -77,3 +77,9 @@ const size_t gMtl4GpuFormatPixelSize[] = {
 	/*GPU_FORMAT_BC5_UNORM=*/		16,	// Block size for 4x4 pixels
 };
 
+const MTLResourceOptions gMtl4ResourceOptionsFor[] = {
+	/*GPU_MEMORY_DEFAULT=*/		MTLResourceStorageModeShared |  MTLResourceCPUCacheModeWriteCombined,
+	/*GPU_MEMORY_GPU=*/		MTLResourceStorageModePrivate,
+	/*GPU_MEMORY_READBACK=*/	MTLResourceStorageModeShared | MTLResourceCPUCacheModeDefaultCache,
+};
+

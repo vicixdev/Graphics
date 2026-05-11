@@ -153,7 +153,6 @@ void mtl4SubmitWithSignal(
 	semaphoreMetadata->lastSignalCount = commandBufferCount;
 }
 void mtl4MemCpy(GpuCommandBuffer cb, void* destGpu, void* srcGpu, size_t size, GpuResult* result) {
-	GpuResult localResult;
 
 	Mtl4CommandBuffer handle = mtl4GpuCommandBufferToHandle(cb);
 	Mtl4CommandBufferMetadata* metadata = mtl4AcquireCommandBufferMetadataFrom(handle);
@@ -162,33 +161,27 @@ void mtl4MemCpy(GpuCommandBuffer cb, void* destGpu, void* srcGpu, size_t size, G
 		return;
 	}
 
-	Mtl4GpuAddress destination = mtl4PtrToGpuAddress(destGpu);
-	Mtl4GpuAddress source = mtl4PtrToGpuAddress(srcGpu);
-
-	Mtl4AllocationMetadata* destinationMetadata = mtl4AcquireAllocationMetadataFromGpuPtr(destination);
+	Mtl4AllocationMetadata* destinationMetadata = mtl4AcquireAllocationMetadataFromGpuPtr(destGpu, true);
 	if (destinationMetadata == nullptr) {
 		CMN_SET_RESULT(result, GPU_NO_SUCH_ALLOCATION_FOUND);
 		return;
 	}
 	defer (mtl4ReleaseAllocationMetadata());
 
-	Mtl4AllocationMetadata* sourceMetadata = mtl4AcquireAllocationMetadataFromGpuPtr(source);
+	Mtl4AllocationMetadata* sourceMetadata = mtl4AcquireAllocationMetadataFromGpuPtr(srcGpu, true);
 	if (sourceMetadata == nullptr) {
 		CMN_SET_RESULT(result, GPU_NO_SUCH_ALLOCATION_FOUND);
 		return;
 	}
 	defer (mtl4ReleaseAllocationMetadata());
 
-	mtl4EnsureBackingBufferIsAllocated(destination, &localResult);
-	if (localResult != GPU_SUCCESS) {
-		CMN_SET_RESULT(result, localResult);
-		return;
-	}
+	size_t destinationOffset = mtl4GpuPtrOffsetFromBase(destinationMetadata, destGpu);
+	size_t sourceOffset = mtl4GpuPtrOffsetFromBase(sourceMetadata, srcGpu);
 
 	mtl4EnsureValidComputeEndoderFor(metadata);
 	[metadata->computeEncoder
-	 	copyFromBuffer:sourceMetadata->buffer sourceOffset:source.offset
-		toBuffer:destinationMetadata->buffer destinationOffset:destination.offset
+	 	copyFromBuffer:sourceMetadata->buffer sourceOffset:destinationOffset
+		toBuffer:destinationMetadata->buffer destinationOffset:sourceOffset
 		size:size];
 
 	CMN_SET_RESULT(result, GPU_SUCCESS);
@@ -204,8 +197,7 @@ void mtl4CopyToTexture(GpuCommandBuffer cb, void* destGpu, void* srcGpu, GpuText
 		return;
 	}
 
-	Mtl4GpuAddress source = mtl4PtrToGpuAddress(srcGpu);
-	Mtl4AllocationMetadata* sourceMetadata = mtl4AcquireAllocationMetadataFromGpuPtr(source);
+	Mtl4AllocationMetadata* sourceMetadata = mtl4AcquireAllocationMetadataFromGpuPtr(srcGpu, true);
 	if (sourceMetadata == nullptr) {
 		CMN_SET_RESULT(result, GPU_NO_SUCH_ALLOCATION_FOUND);
 		return;
@@ -238,10 +230,12 @@ void mtl4CopyToTexture(GpuCommandBuffer cb, void* destGpu, void* srcGpu, GpuText
 				textureMetadata->descriptor.dimensions[2] *
 				gMtl4GpuFormatPixelSize[textureMetadata->descriptor.format];
 
+	size_t sourceOffset = mtl4GpuPtrOffsetFromBase(sourceMetadata, srcGpu);
+
 	// TODO: Support mipmaps.
 	mtl4EnsureValidComputeEndoderFor(metadata);
 	[metadata->computeEncoder copyFromBuffer:sourceMetadata->buffer
-	 	sourceOffset:source.offset
+	 	sourceOffset:sourceOffset
 		sourceBytesPerRow:bytesPerRow
 		sourceBytesPerImage:bytesPerImage
 		sourceSize:textureSize
@@ -263,8 +257,7 @@ void mtl4CopyFromTexture(GpuCommandBuffer cb, void* destGpu, void* srcGpu, GpuTe
 		return;
 	}
 
-	Mtl4GpuAddress destination = mtl4PtrToGpuAddress(destGpu);
-	Mtl4AllocationMetadata* destinationMetadata = mtl4AcquireAllocationMetadataFromGpuPtr(destination);
+	Mtl4AllocationMetadata* destinationMetadata = mtl4AcquireAllocationMetadataFromGpuPtr(destGpu, true);
 	if (destinationMetadata == nullptr) {
 		CMN_SET_RESULT(result, GPU_NO_SUCH_ALLOCATION_FOUND);
 		return;
@@ -297,6 +290,8 @@ void mtl4CopyFromTexture(GpuCommandBuffer cb, void* destGpu, void* srcGpu, GpuTe
 				textureMetadata->descriptor.dimensions[2] *
 				gMtl4GpuFormatPixelSize[textureMetadata->descriptor.format];
 
+	size_t destinationOffset = mtl4GpuPtrOffsetFromBase(destinationMetadata, destGpu);
+
 	// TODO: Support mipmaps.
 	mtl4EnsureValidComputeEndoderFor(metadata);
 	[metadata->computeEncoder copyFromTexture:textureMetadata->texture
@@ -305,7 +300,7 @@ void mtl4CopyFromTexture(GpuCommandBuffer cb, void* destGpu, void* srcGpu, GpuTe
 		sourceOrigin:MTLOriginMake(0, 0, 0)
 		sourceSize:textureSize
 		toBuffer:destinationMetadata->buffer
-		destinationOffset:destination.offset
+		destinationOffset:destinationOffset
 		destinationBytesPerRow:bytesPerRow
 		destinationBytesPerImage:bytesPerImage
 	];
@@ -395,7 +390,6 @@ void mtl4WaitBefore(GpuCommandBuffer cb, GpuStage after, void* ptrGpu, uint64_t 
 }
 
 void mtl4Dispatch(GpuCommandBuffer cb, void* dataGpu, uint32_t gridDimensions[3], GpuResult* result) {
-	GpuResult localResult;
 
 	Mtl4CommandBuffer handle = mtl4GpuCommandBufferToHandle(cb);
 	Mtl4CommandBufferMetadata* metadata = mtl4AcquireCommandBufferMetadataFrom(handle);
@@ -416,20 +410,14 @@ void mtl4Dispatch(GpuCommandBuffer cb, void* dataGpu, uint32_t gridDimensions[3]
 	}
 	defer (mtl4ReleasePipelineMetadata());
 
-	Mtl4AllocationMetadata* allocationMetadata = mtl4AcquireAllocationMetadataFromGpuPtr(dataGpu);
+	Mtl4AllocationMetadata* allocationMetadata = mtl4AcquireAllocationMetadataFromGpuPtr(dataGpu, true);
 	if (allocationMetadata == nullptr) {
 		CMN_SET_RESULT(result, GPU_NO_SUCH_ALLOCATION_FOUND);
 		return;
 	}
 	defer (mtl4ReleaseAllocationMetadata());
 
-	size_t gpuPointerOffset = mtl4GpuAddressOffsetFromBase(dataGpu);
-
-	mtl4EnsureBackingBufferIsAllocated(allocationMetadata, &localResult);
-	if (localResult != GPU_SUCCESS) {
-		CMN_SET_RESULT(result, localResult);
-		return;
-	}
+	size_t gpuPointerOffset = mtl4GpuPtrOffsetFromBase(allocationMetadata, dataGpu);
 
 	MTLGPUAddress baseGpuAddress = [allocationMetadata->buffer gpuAddress] + gpuPointerOffset;
 	[metadata->computeArgumentTable setAddress:baseGpuAddress atIndex:0];

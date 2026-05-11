@@ -158,20 +158,14 @@ void mtl4SignalEvent(
 	}
 	defer (mtl4ReleaseEvent());
 
-	Mtl4AllocationMetadata* allocation = mtl4AcquireAllocationMetadataFromGpuPtr(gpuPtr);
+	Mtl4AllocationMetadata* allocation = mtl4AcquireAllocationMetadataFromGpuPtr(gpuPtr, true);
 	if (allocation == nullptr) {
 		CMN_SET_RESULT(result, GPU_NO_SUCH_ALLOCATION_FOUND);
 		return;
 	}
 	defer (mtl4ReleaseAllocationMetadata());
 
-	mtl4EnsureBackingBufferIsAllocated(allocation, &localResult);
-	if (localResult != GPU_SUCCESS) {
-		CMN_SET_RESULT(result, localResult);
-		return;
-	}
-
-	uintptr_t gpuPtrOffsetFromBase = mtl4GpuAddressOffsetFromBase(gpuPtr);
+	uintptr_t gpuPtrOffsetFromBase = mtl4GpuPtrOffsetFromBase(allocation, gpuPtr);
 
 	size_t fenceUploadValueOffset = mtl4UploadFenceValue(value);
 

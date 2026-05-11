@@ -73,11 +73,23 @@ bool mtl4ValidateGpuHostToDevicePointer(void* ptr, GpuResult* result) {
 		return false;
 	}
 
-	if (mtl4IsAllocationScheduledForDeletion(ptr)) {
+	Mtl4AllocationMetadata* metadata = mtl4AcquireAllocationMetadataFrom(ptr, true);
+	if (metadata == nullptr) {
+		CMN_SET_RESULT(result, GPU_NO_SUCH_ALLOCATION_FOUND);
+		return false;
+	}
+	defer (mtl4ReleaseAllocationMetadata());
+
+	if (mtl4IsAllocationScheduledForDeletion(metadata)) {
 		CMN_SET_RESULT(result, GPU_USE_AFTER_FREE);
 		return false;
 	}
 	
+	if (mtl4IsGpuAddress(metadata, ptr)) {
+		CMN_SET_RESULT(result, GPU_ALLOCATION_MEMORY_IS_GPU);
+		return false;
+	}
+
 	CMN_SET_RESULT(result, GPU_SUCCESS);
 	return true;
 }
@@ -191,23 +203,23 @@ bool mtl4ValidateGpuCreateTexture(const GpuTextureDesc* desc, void* ptrGpu, GpuR
 		return false;
 	}
 
-	if (mtl4IsCpuAddress(ptrGpu)) {
-		CMN_SET_RESULT(result, GPU_ALLOCATION_MEMORY_IS_CPU);
-		return false;
-	}
-
-	if (mtl4IsAllocationScheduledForDeletion(ptrGpu)) {
-		CMN_SET_RESULT(result, GPU_USE_AFTER_FREE);
-		return false;
-	}
-	
-	Mtl4AllocationMetadata* metadata = mtl4AcquireAllocationMetadataFromGpuPtr(ptrGpu);
+	Mtl4AllocationMetadata* metadata = mtl4AcquireAllocationMetadataFrom(ptrGpu, true);
 	if (metadata == nullptr) {
 		CMN_SET_RESULT(result, GPU_NO_SUCH_ALLOCATION_FOUND);
 		return false;
 	}
 	defer (mtl4ReleaseAllocationMetadata());
 
+	if (mtl4IsCpuAddress(metadata, ptrGpu)) {
+		CMN_SET_RESULT(result, GPU_ALLOCATION_MEMORY_IS_CPU);
+		return false;
+	}
+
+	if (mtl4IsAllocationScheduledForDeletion(metadata)) {
+		CMN_SET_RESULT(result, GPU_USE_AFTER_FREE);
+		return false;
+	}
+	
 	if (metadata->memory != GPU_MEMORY_GPU) {
 		CMN_SET_RESULT(result, GPU_ALLOCATION_MEMORY_IS_CPU);
 		return false;
