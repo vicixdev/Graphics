@@ -66,6 +66,9 @@ typedef struct GpuBaseLayer {
 	void (*gpuBarrier)(GpuCommandBuffer cb, GpuStage before, GpuStage after, GpuHazardFlags hazards, GpuResult* result);
 	void (*gpuSignalAfter)(GpuCommandBuffer cb, GpuStage before, void* ptrGpu, uint64_t value, GpuSignal signal, GpuResult* result);
 	void (*gpuWaitBefore)(GpuCommandBuffer cb, GpuStage after, void* ptrGpu, uint64_t value, GpuOp op, GpuHazardFlags hazards, uint64_t mask, GpuResult* result);
+
+	void (*gpuSetPipeline)(GpuCommandBuffer cb, GpuPipeline pipeline, GpuResult* result);
+	void (*gpuDispatch)(GpuCommandBuffer cb, void* dataGpu, uint32_t gridDimensions[3], GpuResult* result);
 } GpuBaseLayer;
 
 typedef struct {

@@ -32,12 +32,17 @@ typedef struct Mtl4CommandBufferMetadata {
 	id<MTL4CommandBuffer>		commandBuffer;
 	id<MTL4ComputeCommandEncoder>	computeEncoder;
 	id<MTL4RenderCommandEncoder>	renderEncoder;
+
+	id<MTL4ArgumentTable>		computeArgumentTable;
+
+	Mtl4Pipeline			pipeline;
 } Mtl4CommandBufferMetadata;
 
 typedef struct Mtl4CommandBufferStorage {
-	id<MTLSharedEvent>		submitEvents[MTL4_MAX_PARALLEL_COMMANDBUFFER_ENCODINGS];
-	id<MTL4CommandAllocator>	commandAllocators[MTL4_MAX_PARALLEL_COMMANDBUFFER_ENCODINGS];
-	id<MTL4CommandQueue>		queues[MTL4_MAX_PARALLEL_COMMANDBUFFER_ENCODINGS];
+	id<MTLSharedEvent>		submitEvents		[MTL4_MAX_PARALLEL_COMMANDBUFFER_ENCODINGS];
+	id<MTL4CommandAllocator>	commandAllocators	[MTL4_MAX_PARALLEL_COMMANDBUFFER_ENCODINGS];
+	id<MTL4CommandQueue>		queues			[MTL4_MAX_PARALLEL_COMMANDBUFFER_ENCODINGS];
+	id<MTL4ArgumentTable>		computeArgumentTables	[MTL4_MAX_PARALLEL_COMMANDBUFFER_ENCODINGS];
 
 	// Atomic
 	uint64_t submitCount;
@@ -65,16 +70,28 @@ void mtl4MemCpy(GpuCommandBuffer cb, void* destGpu, void* srcGpu, size_t size, G
 void mtl4CopyToTexture(GpuCommandBuffer cb, void* destGpu, void* srcGpu, GpuTexture texture, GpuResult* result);
 void mtl4CopyFromTexture(GpuCommandBuffer cb, void* destGpu, void* srcGpu, GpuTexture texture, GpuResult* result);
 
+void mtl4SetPipeline(GpuCommandBuffer cb, GpuPipeline pipeline, GpuResult* result);
 void mtl4SetActiveTextureHeapPtr(GpuCommandBuffer cb, void *ptrGpu, GpuResult* result);
 
 void mtl4Barrier(GpuCommandBuffer cb, GpuStage before, GpuStage after, GpuHazardFlags hazards, GpuResult* result);
 void mtl4SignalAfter(GpuCommandBuffer cb, GpuStage before, void* ptrGpu, uint64_t value, GpuSignal signal, GpuResult* result);
 void mtl4WaitBefore(GpuCommandBuffer cb, GpuStage after, void* ptrGpu, uint64_t value, GpuOp op, GpuHazardFlags hazards, uint64_t mask, GpuResult* result);
 
-bool mtl4AcquireResourcesForNewCommandBuffer(Mtl4CommandBuffer* handle, id<MTL4CommandQueue>* queue, id<MTL4CommandAllocator>* mtlAllocator, id<MTLSharedEvent>* submitEvent);
+void mtl4Dispatch(GpuCommandBuffer cb, void* dataGpu, uint32_t gridDimensions[3], GpuResult* result);
+
+bool mtl4AcquireResourcesForNewCommandBuffer(
+	Mtl4CommandBuffer* handle,
+	id<MTL4CommandQueue>* queue,
+	id<MTL4CommandAllocator>* mtlAllocator,
+	id<MTL4ArgumentTable>* computeArgumentTable,
+	id<MTLSharedEvent>* submitEvent
+);
 // NOTE: Requires deletion-lock on gMtl4CommandBufferStorage.sync.
 void mtl4ReleaseCommandBufferResources(Mtl4CommandBuffer handle);
 bool mtl4IsCommandBufferScheduledForDeletion(Mtl4CommandBuffer commandBuffer);
+
+void mtl4PushDebugLabel(Mtl4CommandBufferMetadata* metadata, const char* label);
+void mtl4PopDebugLabel(Mtl4CommandBufferMetadata* metadata);
 
 void mtl4EnsureValidCommandBuffer(Mtl4CommandBufferMetadata* metadata);
 void mtl4EnsureValidComputeEndoderFor(Mtl4CommandBufferMetadata* metadata);

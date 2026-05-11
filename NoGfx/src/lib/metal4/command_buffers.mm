@@ -49,6 +49,24 @@ void mtl4InitCommandBufferStorage(GpuResult* result) {
 		gMtl4CommandBufferStorage.submitEvents[i] = event;
 	}
 
+	MTL4ArgumentTableDescriptor* computeArgumentTableDesc = [MTL4ArgumentTableDescriptor new];
+	defer ([computeArgumentTableDesc release]);
+	computeArgumentTableDesc.maxBufferBindCount = 1;
+	computeArgumentTableDesc.maxSamplerStateBindCount = 0;
+	computeArgumentTableDesc.maxTextureBindCount = 0;
+
+	for (size_t i = 0; i < MTL4_MAX_PARALLEL_COMMANDBUFFER_ENCODINGS; i++) {
+		id<MTL4ArgumentTable> argumentTable = [gMtl4Context.device
+			newArgumentTableWithDescriptor:computeArgumentTableDesc
+			error:nullptr];
+		if (argumentTable == nil) {
+			CMN_SET_RESULT(result, GPU_OUT_OF_CPU_MEMORY);
+			return;
+		}
+
+		gMtl4CommandBufferStorage.computeArgumentTables[i] = argumentTable;
+	}
+
 	CMN_SET_RESULT(result, GPU_SUCCESS);
 	return;
 }
@@ -66,6 +84,12 @@ void mtl4FiniCommandBufferStorage(void) {
 		}
 	}
 
+	for (size_t i = 0; i < MTL4_MAX_PARALLEL_COMMANDBUFFER_ENCODINGS; i++) {
+		if (gMtl4CommandBufferStorage.computeArgumentTables[i] != nil) {
+			[gMtl4CommandBufferStorage.computeArgumentTables[i] release];
+		}
+	}
+
 	gMtl4CommandBufferStorage = {};
 	return;
 }
@@ -77,8 +101,9 @@ GpuCommandBuffer mtl4StartCommandEncoding(GpuQueue queue, GpuResult* result) {
 	id<MTL4CommandQueue> mtlQueue;
 	id<MTL4CommandAllocator> mtlAllocator;
 	id<MTLSharedEvent> submitEvent;
+	id<MTL4ArgumentTable> computeArgumentTable;
 
-	if (!mtl4AcquireResourcesForNewCommandBuffer(&handle, &mtlQueue, &mtlAllocator, &submitEvent)) {
+	if (!mtl4AcquireResourcesForNewCommandBuffer(&handle, &mtlQueue, &mtlAllocator, &computeArgumentTable, &submitEvent)) {
 		CMN_SET_RESULT(result, GPU_TOO_MANY_UNSUBMITTED_COMMAND_BUFFERS);
 		return {};
 	}
@@ -90,6 +115,7 @@ GpuCommandBuffer mtl4StartCommandEncoding(GpuQueue queue, GpuResult* result) {
 	metadata->queue = mtlQueue;
 	metadata->submitEvent = submitEvent;
 	metadata->commandAllocator = mtlAllocator;
+	metadata->computeArgumentTable = computeArgumentTable;
 
 	uint64_t submitCount = cmnAtomicLoad(&gMtl4CommandBufferStorage.submitCount);
 	[metadata->queue waitForEvent:submitEvent value:submitCount];
@@ -286,6 +312,31 @@ void mtl4CopyFromTexture(GpuCommandBuffer cb, void* destGpu, void* srcGpu, GpuTe
 
 }
 
+void mtl4SetPipeline(GpuCommandBuffer cb, GpuPipeline pipeline, GpuResult* result) {
+	Mtl4CommandBuffer handle = mtl4GpuCommandBufferToHandle(cb);
+	Mtl4CommandBufferMetadata* metadata = mtl4AcquireCommandBufferMetadataFrom(handle);
+	if (metadata == nullptr) {
+		CMN_SET_RESULT(result, GPU_NO_SUCH_COMMAND_BUFFER_FOUND);
+		return;
+	}
+
+	// TODO: Move to validation
+	// Mtl4Pipeline pipelineHandle = mtl4GpuPipelineToHandle(pipeline);
+	// Mtl4PipelineMetadata* pipelineMetadata = mtl4AcquirePipelineMetadataFrom(pipelineHandle);
+	// if (pipelineMetadata == nullptr) {
+	// 	CMN_SET_RESULT(result, GPU_NO_SUCH_PIPELINE_FOUND);
+	// 	return;
+	// }
+	// defer (mtl4ReleasePipelineMetadata());
+
+	// if (pipelineMetadata->type != MTL4_PIPELINE_COMPUTE) {
+	// 	CMN_SET_RESULT(result, GPU_INCOMPATIBLE_PIPELINE);
+	// 	return;
+	// }
+
+	metadata->pipeline = mtl4GpuPipelineToHandle(pipeline);
+}
+
 void mtl4Barrier(GpuCommandBuffer cb, GpuStage before, GpuStage after, GpuHazardFlags hazards, GpuResult* result) {
 	Mtl4CommandBuffer handle = mtl4GpuCommandBufferToHandle(cb);
 	Mtl4CommandBufferMetadata* metadata = mtl4AcquireCommandBufferMetadataFrom(handle);
@@ -343,7 +394,65 @@ void mtl4WaitBefore(GpuCommandBuffer cb, GpuStage after, void* ptrGpu, uint64_t 
 	mtl4WaitEvent(metadata, after, ptrGpu, value, result);
 }
 
-bool mtl4AcquireResourcesForNewCommandBuffer(Mtl4CommandBuffer* handle, id<MTL4CommandQueue>* queue, id<MTL4CommandAllocator>* mtlAllocator, id<MTLSharedEvent>* submitEvent) {
+void mtl4Dispatch(GpuCommandBuffer cb, void* dataGpu, uint32_t gridDimensions[3], GpuResult* result) {
+	GpuResult localResult;
+
+	Mtl4CommandBuffer handle = mtl4GpuCommandBufferToHandle(cb);
+	Mtl4CommandBufferMetadata* metadata = mtl4AcquireCommandBufferMetadataFrom(handle);
+	if (metadata == nullptr) {
+		CMN_SET_RESULT(result, GPU_NO_SUCH_COMMAND_BUFFER_FOUND);
+		return;
+	}
+
+	Mtl4PipelineMetadata* pipelineMetadata = mtl4AcquirePipelineMetadataFrom(metadata->pipeline);
+	if (pipelineMetadata == nullptr) {
+		CMN_SET_RESULT(result, GPU_NO_SUCH_PIPELINE_FOUND);
+		return;
+	}
+
+	if (pipelineMetadata->type != MTL4_PIPELINE_COMPUTE) {
+		CMN_SET_RESULT(result, GPU_INCOMPATIBLE_PIPELINE);
+		return;
+	}
+	defer (mtl4ReleasePipelineMetadata());
+
+	Mtl4AllocationMetadata* allocationMetadata = mtl4AcquireAllocationMetadataFromGpuPtr(dataGpu);
+	if (allocationMetadata == nullptr) {
+		CMN_SET_RESULT(result, GPU_NO_SUCH_ALLOCATION_FOUND);
+		return;
+	}
+	defer (mtl4ReleaseAllocationMetadata());
+
+	size_t gpuPointerOffset = mtl4GpuAddressOffsetFromBase(dataGpu);
+
+	mtl4EnsureBackingBufferIsAllocated(allocationMetadata, &localResult);
+	if (localResult != GPU_SUCCESS) {
+		CMN_SET_RESULT(result, localResult);
+		return;
+	}
+
+	MTLGPUAddress baseGpuAddress = [allocationMetadata->buffer gpuAddress] + gpuPointerOffset;
+	[metadata->computeArgumentTable setAddress:baseGpuAddress atIndex:0];
+
+	mtl4EnsureValidComputeEndoderFor(metadata);
+	[metadata->computeEncoder setComputePipelineState:pipelineMetadata->compute.pso];
+	[metadata->computeEncoder setArgumentTable:metadata->computeArgumentTable];
+	// TODO: Get groupSize from the pipeline... In some way...
+	[metadata->computeEncoder
+		dispatchThreadgroups:MTLSizeMake(gridDimensions[0], gridDimensions[1], gridDimensions[2])
+		threadsPerThreadgroup:MTLSizeMake(1, 1, 1)];
+
+	CMN_SET_RESULT(result, GPU_SUCCESS);
+	return;
+}
+
+bool mtl4AcquireResourcesForNewCommandBuffer(
+	Mtl4CommandBuffer* handle,
+	id<MTL4CommandQueue>* queue,
+	id<MTL4CommandAllocator>* mtlAllocator,
+	id<MTL4ArgumentTable>* computeArgumentTable,
+	id<MTLSharedEvent>* submitEvent
+) {
 	
 	CmnResult localResult;
 
@@ -359,6 +468,7 @@ bool mtl4AcquireResourcesForNewCommandBuffer(Mtl4CommandBuffer* handle, id<MTL4C
 
 	*queue		= gMtl4CommandBufferStorage.queues[handle->index];
 	*mtlAllocator	= gMtl4CommandBufferStorage.commandAllocators[handle->index];
+	*computeArgumentTable = gMtl4CommandBufferStorage.computeArgumentTables[handle->index];
 	*submitEvent	= gMtl4CommandBufferStorage.submitEvents[handle->index];
 
 	return true;
@@ -404,6 +514,18 @@ void mtl4FlushCommandBuffer(Mtl4CommandBufferMetadata* metadata) {
 
 	[metadata->commandBuffer release];
 	metadata->commandBuffer = nil;
+}
+
+void mtl4PushDebugLabel(Mtl4CommandBufferMetadata* metadata, const char* label) {
+	NSString* nsLabel = [[NSString alloc] initWithCString:label encoding:NSASCIIStringEncoding];
+	defer ([nsLabel release]);
+
+	mtl4EnsureValidCommandBuffer(metadata);
+	[metadata->commandBuffer pushDebugGroup:nsLabel];
+}
+
+void mtl4PopDebugLabel(Mtl4CommandBufferMetadata* metadata) {
+	[metadata->commandBuffer popDebugGroup];
 }
 
 void mtl4StartCommandBufferExecution(Mtl4CommandBufferMetadata* metadata) {

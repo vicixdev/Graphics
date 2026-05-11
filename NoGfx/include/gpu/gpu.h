@@ -25,11 +25,13 @@ typedef enum GpuResult {
 	GPU_NO_SUCH_TEXTURE_FOUND,
 	GPU_NO_SUCH_QUEUE_FOUND,
 	GPU_NO_SUCH_COMMAND_BUFFER_FOUND,
+	GPU_NO_SUCH_PIPELINE_FOUND,
 	GPU_NO_SUCH_SEMAPHORE_FOUND,
 	GPU_ALLOCATION_MEMORY_IS_GPU,
 	GPU_ALLOCATION_MEMORY_IS_CPU,
 
 	GPU_PIPELINE_IR_VALIDATION_FAILED,
+	GPU_INCOMPATIBLE_PIPELINE,
 
 	GPU_TOO_MANY_UNSUBMITTED_COMMAND_BUFFERS,
 	GPU_ALREADY_SUBMITTED,
@@ -267,6 +269,9 @@ typedef struct GpuLayer {
 	bool (*gpuBarrier)(GpuCommandBuffer cb, GpuStage before, GpuStage after, GpuHazardFlags hazards, GpuResult* result);
 	bool (*gpuSignalAfter)(GpuCommandBuffer cb, GpuStage before, void* ptrGpu, uint64_t value, GpuSignal signal, GpuResult* result);
 	bool (*gpuWaitBefore)(GpuCommandBuffer cb, GpuStage after, void* ptrGpu, uint64_t value, GpuOp op, GpuHazardFlags hazards, uint64_t mask, GpuResult* result);
+
+	bool (*gpuSetPipeline)(GpuCommandBuffer cb, GpuPipeline pipeline, GpuResult* result);
+	bool (*gpuDispatch)(GpuCommandBuffer cb, void* dataGpu, uint32_t gridDimensions[3], GpuResult* result);
 } GpuLayer;
 
 typedef struct GpuInitDesc {
@@ -339,12 +344,12 @@ void gpuBarrier(GpuCommandBuffer cb, GpuStage before, GpuStage after, GpuHazardF
 void gpuSignalAfter(GpuCommandBuffer cb, GpuStage before, void* ptrGpu, uint64_t value, GpuSignal signal, GpuResult* result);
 void gpuWaitBefore(GpuCommandBuffer cb, GpuStage after, void* ptrGpu, uint64_t value, GpuOp op, GpuHazardFlags hazards, uint64_t mask, GpuResult* result);
 
-void gpuSetPipeline(GpuCommandBuffer cb, GpuPipeline pipeline);
+void gpuSetPipeline(GpuCommandBuffer cb, GpuPipeline pipeline, GpuResult* result);
 // void gpuSetDepthStencilState(GpuCommandBuffer cb, GpuDepthStencilState state);
 // void gpuSetBlendState(GpuCommandBuffer cb, GpuBlendState state); 
 
-void gpuDispatch(GpuCommandBuffer cb, void* dataGpu, uint32_t gridDimensions[3]);
-void gpuDispatchIndirect(GpuCommandBuffer cb, void* dataGpu, void* gridDimensionsGpu);
+void gpuDispatch(GpuCommandBuffer cb, void* dataGpu, uint32_t gridDimensions[3], GpuResult* result);
+void gpuDispatchIndirect(GpuCommandBuffer cb, void* dataGpu, void* gridDimensionsGpu, GpuResult* result);
 
 // void gpuBeginRenderPass(GpuCommandBuffer cb, GpuRenderPassDesc desc);
 // void gpuEndRenderPass(GpuCommandBuffer cb);

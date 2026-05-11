@@ -199,4 +199,11 @@ void gpuWaitBefore(GpuCommandBuffer cb, GpuStage after, void* ptrGpu, uint64_t v
 	GPU_LAYERED_CALL(gpuWaitBefore, cb, after, ptrGpu, value, op, hazards, mask, result);
 }
 
+void gpuSetPipeline(GpuCommandBuffer cb, GpuPipeline pipeline, GpuResult* result) {
+	GPU_LAYERED_CALL(gpuSetPipeline, cb, pipeline, result);
+}
+
+void gpuDispatch(GpuCommandBuffer cb, void* dataGpu, uint32_t gridDimensions[3], GpuResult* result) {
+	GPU_LAYERED_CALL(gpuDispatch, cb, dataGpu, gridDimensions, result);
+}
 

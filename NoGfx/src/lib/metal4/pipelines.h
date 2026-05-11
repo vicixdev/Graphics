@@ -42,7 +42,7 @@ typedef struct Mtl4GraphicsPipelineMetadata {
 
 typedef struct Mtl4ComputePipelineMetadata {
 	// Final
-	Mtl4Function function;
+	id<MTLComputePipelineState> pso;
 } Mtl4ComputePipelineMetadata;
 
 typedef struct Mtl4MeshletPipelineMetadata {

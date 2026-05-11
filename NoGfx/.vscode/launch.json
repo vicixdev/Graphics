@@ -56,6 +56,19 @@
                 // "MTL_CAPTURE_ENABLED": "1"
             },
             "cwd": "${workspaceFolder}/examples/04_Signals"
+        },
+        {
+            "type": "lldb",
+            "request": "launch",
+            "name": "05_Pipelines",
+            "program": "${workspaceFolder}/examples/05_Pipelines/out",
+            "args": [],
+            "env": {
+                "MTL_DEBUG_LAYER": "1",
+                // "MTL_DEBUG_LAYER_WARNING_MODE": "nslog",
+                // "MTL_CAPTURE_ENABLED": "1"
+            },
+            "cwd": "${workspaceFolder}/examples/05_Pipelines"
         }
     ]
 }

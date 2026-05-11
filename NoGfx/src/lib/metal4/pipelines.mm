@@ -220,6 +220,7 @@ Mtl4CompiledIr mtl4CompileIr(const uint8_t* ir, size_t irSize, GpuResult* result
 	NSError* error;
 	id<MTLLibrary> library = [gMtl4Context.device newLibraryWithData:data error:&error];
 	if (library == nil) {
+		printf("Failed to compile shader ir: %s\n", [[error localizedDescription] UTF8String]);
 		CMN_SET_RESULT(result, GPU_PIPELINE_IR_VALIDATION_FAILED);
 		return {};
 	}
@@ -318,9 +319,22 @@ Mtl4Pipeline mtl4CreateComputePipeline(Mtl4Function function, GpuResult* result)
 	CmnResult localResult;
 	CmnScopedStorageSyncLockWrite guard(&gMtl4PipelineStorage.sync);
 
+	MTL4ComputePipelineDescriptor* psoDesc = [MTL4ComputePipelineDescriptor new];
+	defer ([psoDesc release]);
+	psoDesc.computeFunctionDescriptor = function.descriptor;
+
+	id<MTLComputePipelineState> pso = [gMtl4PipelineStorage.compiler
+		newComputePipelineStateWithDescriptor:psoDesc
+		compilerTaskOptions:nullptr
+		error:nullptr];
+	if (pso == nil) {
+		CMN_SET_RESULT(result, GPU_PIPELINE_IR_VALIDATION_FAILED);
+		return {};
+	}
+
 	Mtl4PipelineMetadata metadata = {};
-	metadata.type = MTL4_PIPELINE_COMPUTE;
-	metadata.compute.function = function;
+	metadata.type			= MTL4_PIPELINE_COMPUTE;
+	metadata.compute.pso		= pso;
 
 	Mtl4Pipeline pipeline = cmnInsert(&gMtl4PipelineStorage.pipelines, metadata, &localResult);
 	if (localResult != CMN_SUCCESS) {
@@ -412,7 +426,8 @@ void mtl4DestroyPipeline(Mtl4Pipeline pipeline) {
 
 	switch (metadata.type) {
 		case MTL4_PIPELINE_COMPUTE: {
-			mtl4DestroyFunction(metadata.compute.function);
+			[metadata.compute.pso release];
+
 			break;
 		}
 		case MTL4_PIPELINE_GRAPHICS: {
