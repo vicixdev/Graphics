@@ -73,9 +73,9 @@ void mtl4CopyFromTexture(GpuCommandBuffer cb, void* destGpu, void* srcGpu, GpuTe
 void mtl4SetPipeline(GpuCommandBuffer cb, GpuPipeline pipeline, GpuResult* result);
 void mtl4SetActiveTextureHeapPtr(GpuCommandBuffer cb, void *ptrGpu, GpuResult* result);
 
-void mtl4Barrier(GpuCommandBuffer cb, GpuStage before, GpuStage after, GpuHazardFlags hazards, GpuResult* result);
-void mtl4SignalAfter(GpuCommandBuffer cb, GpuStage before, void* ptrGpu, uint64_t value, GpuSignal signal, GpuResult* result);
-void mtl4WaitBefore(GpuCommandBuffer cb, GpuStage after, void* ptrGpu, uint64_t value, GpuOp op, GpuHazardFlags hazards, uint64_t mask, GpuResult* result);
+void mtl4Barrier(GpuCommandBuffer cb, GpuStageFlags before, GpuStageFlags after, GpuHazardFlags hazards, GpuResult* result);
+void mtl4SignalAfter(GpuCommandBuffer cb, GpuStageFlags before, void* ptrGpu, uint64_t value, GpuSignal signal, GpuResult* result);
+void mtl4WaitBefore(GpuCommandBuffer cb, GpuStageFlags after, void* ptrGpu, uint64_t value, GpuOp op, GpuHazardFlags hazards, uint64_t mask, GpuResult* result);
 
 void mtl4Dispatch(GpuCommandBuffer cb, void* dataGpu, uint32_t gridDimensions[3], GpuResult* result);
 
@@ -100,12 +100,12 @@ void mtl4FlushCommandBuffer(Mtl4CommandBufferMetadata* metadata);
 void mtl4SubmitSingleBuffer(GpuQueue queue, GpuCommandBuffer commandBuffer, id<MTLSharedEvent> event, uint64_t value, GpuResult* result);
 void mtl4StartCommandBufferExecution(Mtl4CommandBufferMetadata* metadata);
 
-bool mtl4IsStageCompute(GpuStage stage);
-bool mtl4IsStageRender(GpuStage stage);
+bool mtl4IsStageCompute(GpuStageFlags stage);
+bool mtl4IsStageRender(GpuStageFlags stage);
 
-MTLStages mtl4GpuToMtlStage(GpuStage stage);
-MTLStages mtl4GpuToMtlComputeStage(GpuStage stage);
-MTLStages mtl4GpuToMtlFragmentStage(GpuStage stage);
+MTLStages mtl4GpuToMtlStage(GpuStageFlags stage);
+MTLStages mtl4GpuToMtlComputeStage(GpuStageFlags stage);
+MTLStages mtl4GpuToMtlFragmentStage(GpuStageFlags stage);
 MTL4VisibilityOptions mtl4GpuHazardsToMtlVisibilityOptions(GpuHazardFlags hazards);
 
 Mtl4CommandBufferMetadata* mtl4AcquireCommandBufferMetadataFrom(Mtl4CommandBuffer handle);

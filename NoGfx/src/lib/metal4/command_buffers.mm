@@ -332,7 +332,7 @@ void mtl4SetPipeline(GpuCommandBuffer cb, GpuPipeline pipeline, GpuResult* resul
 	metadata->pipeline = mtl4GpuPipelineToHandle(pipeline);
 }
 
-void mtl4Barrier(GpuCommandBuffer cb, GpuStage before, GpuStage after, GpuHazardFlags hazards, GpuResult* result) {
+void mtl4Barrier(GpuCommandBuffer cb, GpuStageFlags before, GpuStageFlags after, GpuHazardFlags hazards, GpuResult* result) {
 	Mtl4CommandBuffer handle = mtl4GpuCommandBufferToHandle(cb);
 	Mtl4CommandBufferMetadata* metadata = mtl4AcquireCommandBufferMetadataFrom(handle);
 	if (metadata == nullptr) {
@@ -361,7 +361,7 @@ void mtl4Barrier(GpuCommandBuffer cb, GpuStage before, GpuStage after, GpuHazard
 	CMN_SET_RESULT(result, GPU_SUCCESS);
 }
 
-void mtl4SignalAfter(GpuCommandBuffer cb, GpuStage before, void* ptrGpu, uint64_t value, GpuSignal signal, GpuResult* result) {
+void mtl4SignalAfter(GpuCommandBuffer cb, GpuStageFlags before, void* ptrGpu, uint64_t value, GpuSignal signal, GpuResult* result) {
 	assert(signal == GPU_SIGNAL_ATOMIC_MAX && "The only supported signal operation is GPU_SIGNAL_ATOMIC_MAX.");
 
 	Mtl4CommandBuffer handle = mtl4GpuCommandBufferToHandle(cb);
@@ -374,7 +374,7 @@ void mtl4SignalAfter(GpuCommandBuffer cb, GpuStage before, void* ptrGpu, uint64_
 	mtl4SignalEvent(metadata, before, ptrGpu, value, result);
 }
 
-void mtl4WaitBefore(GpuCommandBuffer cb, GpuStage after, void* ptrGpu, uint64_t value, GpuOp op, GpuHazardFlags hazards, uint64_t mask, GpuResult* result) {
+void mtl4WaitBefore(GpuCommandBuffer cb, GpuStageFlags after, void* ptrGpu, uint64_t value, GpuOp op, GpuHazardFlags hazards, uint64_t mask, GpuResult* result) {
 	(void)hazards;
 	assert(op == GPU_OP_GREATER_EQUAL && "The only supported wait operation is GPU_OP_GREATER_EQUAL.");
 	assert(mask == ~(uint64_t)0 && "The only supported mask is ~0.");
@@ -550,15 +550,15 @@ void mtl4SubmitSingleBuffer(GpuQueue queue, GpuCommandBuffer commandBuffer, id<M
 	mtl4ReleaseCommandBufferResources(handle);
 }
 
-bool mtl4IsStageCompute(GpuStage stage) {
+bool mtl4IsStageCompute(GpuStageFlags stage) {
 	return GPU_STAGE_COMPUTE & stage || GPU_STAGE_TRANSFER & stage;
 }
 
-bool mtl4IsStageRender(GpuStage stage) {
+bool mtl4IsStageRender(GpuStageFlags stage) {
 	return GPU_STAGE_PIXEL_SHADER & stage || GPU_STAGE_RASTER_COLOR_OUT & stage || GPU_STAGE_VERTEX_SHADER & stage;
 }
 
-bool mtl4CanImposeNormalMtlBarrierBetween(GpuStage before, GpuStage after, GpuHazardFlags hazards) {
+bool mtl4CanImposeNormalMtlBarrierBetween(GpuStageFlags before, GpuStageFlags after, GpuHazardFlags hazards) {
 	(void)hazards;
 
 	bool cannotImpose = before & GPU_STAGE_PIXEL_SHADER ||
@@ -568,7 +568,7 @@ bool mtl4CanImposeNormalMtlBarrierBetween(GpuStage before, GpuStage after, GpuHa
 	return !cannotImpose;
 }
 
-MTLStages mtl4GpuToMtlStage(GpuStage stage) {
+MTLStages mtl4GpuToMtlStage(GpuStageFlags stage) {
 	MTLStages stages = 0;
 
 	if (stage & GPU_STAGE_TRANSFER) {

@@ -303,7 +303,7 @@ bool mtl4ValidateGpuTextureRWViewDescriptor(GpuTexture texture, const GpuViewDes
 	return mtl4ValidateGpuTextureViewDescriptor(texture, desc, result);
 }
 
-bool mtl4ValidateGpuSignalAfter(GpuCommandBuffer cb, GpuStage before, void* ptrGpu, uint64_t value, GpuSignal signal, GpuResult* result) {
+bool mtl4ValidateGpuSignalAfter(GpuCommandBuffer cb, GpuStageFlags before, void* ptrGpu, uint64_t value, GpuSignal signal, GpuResult* result) {
 	(void)cb;
 	(void)before;
 	(void)ptrGpu;
@@ -318,7 +318,7 @@ bool mtl4ValidateGpuSignalAfter(GpuCommandBuffer cb, GpuStage before, void* ptrG
 	return true;
 }
 
-bool mtl4ValidateGpuWaitBefore(GpuCommandBuffer cb, GpuStage after, void* ptrGpu, uint64_t value, GpuOp op, GpuHazardFlags hazards, uint64_t mask, GpuResult* result) {
+bool mtl4ValidateGpuWaitBefore(GpuCommandBuffer cb, GpuStageFlags after, void* ptrGpu, uint64_t value, GpuOp op, GpuHazardFlags hazards, uint64_t mask, GpuResult* result) {
 	(void)cb;
 	(void)after;
 	(void)ptrGpu;

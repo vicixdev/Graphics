@@ -16,8 +16,8 @@ bool mtl4ValidateGpuCreateTexture(const GpuTextureDesc* desc, void* ptrGpu, GpuR
 bool mtl4ValidateGpuTextureViewDescriptor(GpuTexture texture, const GpuViewDesc* desc, GpuResult* result);
 bool mtl4ValidateGpuTextureRWViewDescriptor(GpuTexture texture, const GpuViewDesc* desc, GpuResult* result);
 
-bool mtl4ValidateGpuSignalAfter(GpuCommandBuffer cb, GpuStage before, void* ptrGpu, uint64_t value, GpuSignal signal, GpuResult* result);
-bool mtl4ValidateGpuWaitBefore(GpuCommandBuffer cb, GpuStage after, void* ptrGpu, uint64_t value, GpuOp op, GpuHazardFlags hazards, uint64_t mask, GpuResult* result);
+bool mtl4ValidateGpuSignalAfter(GpuCommandBuffer cb, GpuStageFlags before, void* ptrGpu, uint64_t value, GpuSignal signal, GpuResult* result);
+bool mtl4ValidateGpuWaitBefore(GpuCommandBuffer cb, GpuStageFlags after, void* ptrGpu, uint64_t value, GpuOp op, GpuHazardFlags hazards, uint64_t mask, GpuResult* result);
 
 #endif // GPU_METAL4_VALIDATION_H
 

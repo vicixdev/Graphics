@@ -142,7 +142,7 @@ size_t mtl4UploadFenceValue(uint64_t value) {
 
 void mtl4SignalEvent(
 	Mtl4CommandBufferMetadata* commandBuffer,
-	GpuStage after,
+	GpuStageFlags after,
 	void* gpuPtr,
 	uint64_t value,
 	GpuResult* result
@@ -186,7 +186,7 @@ void mtl4SignalEvent(
 
 void mtl4WaitEvent(
 	Mtl4CommandBufferMetadata* commandBuffer,
-	GpuStage before,
+	GpuStageFlags before,
 	void* gpuPtr,
 	uint64_t value,
 	GpuResult* result
