@@ -36,7 +36,7 @@ void mtl4InitCommandBufferStorage(GpuResult* result) {
 
 		gMtl4CommandBufferStorage.queues[i] = queue;
 		[queue addResidencySet:gMtl4AllocationStorage.residencySet];
-		[queue addResidencySet:gMtl4EventStorage.uploadBufferResidencySet];
+		// [queue addResidencySet:gMtl4EventStorage.uploadBufferResidencySet];
 	}
 
 	for (size_t i = 0; i < MTL4_MAX_PARALLEL_COMMANDBUFFER_ENCODINGS; i++) {
@@ -362,31 +362,33 @@ void mtl4Barrier(GpuCommandBuffer cb, GpuStage before, GpuStage after, GpuHazard
 }
 
 void mtl4SignalAfter(GpuCommandBuffer cb, GpuStage before, void* ptrGpu, uint64_t value, GpuSignal signal, GpuResult* result) {
-	assert(signal == GPU_SIGNAL_ATOMIC_MAX && "The only supported signal operation is GPU_SIGNAL_ATOMIC_MAX.");
+	// assert(signal == GPU_SIGNAL_ATOMIC_MAX && "The only supported signal operation is GPU_SIGNAL_ATOMIC_MAX.");
 
-	Mtl4CommandBuffer handle = mtl4GpuCommandBufferToHandle(cb);
-	Mtl4CommandBufferMetadata* metadata = mtl4AcquireCommandBufferMetadataFrom(handle);
-	if (metadata == nullptr) {
-		CMN_SET_RESULT(result, GPU_NO_SUCH_COMMAND_BUFFER_FOUND);
-		return;
-	}
+	// Mtl4CommandBuffer handle = mtl4GpuCommandBufferToHandle(cb);
+	// Mtl4CommandBufferMetadata* metadata = mtl4AcquireCommandBufferMetadataFrom(handle);
+	// if (metadata == nullptr) {
+	// 	CMN_SET_RESULT(result, GPU_NO_SUCH_COMMAND_BUFFER_FOUND);
+	// 	return;
+	// }
 
-	mtl4SignalEvent(metadata, before, ptrGpu, value, result);
+	// mtl4SignalEvent(metadata, before, ptrGpu, value, result);
+	mtl4SignalEvent(cb, before, signal, ptrGpu, value, result);
 }
 
 void mtl4WaitBefore(GpuCommandBuffer cb, GpuStage after, void* ptrGpu, uint64_t value, GpuOp op, GpuHazardFlags hazards, uint64_t mask, GpuResult* result) {
-	(void)hazards;
-	assert(op == GPU_OP_GREATER_EQUAL && "The only supported wait operation is GPU_OP_GREATER_EQUAL.");
-	assert(mask == ~(uint64_t)0 && "The only supported mask is ~0.");
+	// (void)hazards;
+	// assert(op == GPU_OP_GREATER_EQUAL && "The only supported wait operation is GPU_OP_GREATER_EQUAL.");
+	// assert(mask == ~(uint64_t)0 && "The only supported mask is ~0.");
 
-	Mtl4CommandBuffer handle = mtl4GpuCommandBufferToHandle(cb);
-	Mtl4CommandBufferMetadata* metadata = mtl4AcquireCommandBufferMetadataFrom(handle);
-	if (metadata == nullptr) {
-		CMN_SET_RESULT(result, GPU_NO_SUCH_COMMAND_BUFFER_FOUND);
-		return;
-	}
+	// Mtl4CommandBuffer handle = mtl4GpuCommandBufferToHandle(cb);
+	// Mtl4CommandBufferMetadata* metadata = mtl4AcquireCommandBufferMetadataFrom(handle);
+	// if (metadata == nullptr) {
+	// 	CMN_SET_RESULT(result, GPU_NO_SUCH_COMMAND_BUFFER_FOUND);
+	// 	return;
+	// }
 
-	mtl4WaitEvent(metadata, after, ptrGpu, value, result);
+	// mtl4WaitEvent(metadata, after, ptrGpu, value, result);
+	mtl4WaitEvent(cb, after, op, ptrGpu, value, mask, result);
 }
 
 void mtl4Dispatch(GpuCommandBuffer cb, void* dataGpu, uint32_t gridDimensions[3], GpuResult* result) {

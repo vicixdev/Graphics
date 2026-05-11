@@ -120,6 +120,9 @@ typedef enum GpuStage {
 } GpuStage;
 typedef size_t GpuStageFlags; // bitfield of GpuStage
 
+#define GPU_STAGES_NONE (GpuStageFlags)0
+#define GPU_STAGES_ALL (GpuStageFlags)(GPU_STAGE_TRANSFER | GPU_STAGE_COMPUTE | GPU_STAGE_RASTER_COLOR_OUT | GPU_STAGE_PIXEL_SHADER | GPU_STAGE_VERTEX_SHADER)
+
 typedef enum GpuHazard {
 	GPU_HAZARD_NONE = 0,
 	GPU_HAZARD_DRAW_ARGUMENTS = 0x1,

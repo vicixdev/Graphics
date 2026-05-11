@@ -309,10 +309,10 @@ bool mtl4ValidateGpuSignalAfter(GpuCommandBuffer cb, GpuStage before, void* ptrG
 	(void)ptrGpu;
 	(void)value;
 
-	if (signal != GPU_SIGNAL_ATOMIC_MAX) {
-		CMN_SET_RESULT(result, GPU_UNSUPPORTED_OPERATION);
-		return false;
-	}
+	// if (signal != GPU_SIGNAL_ATOMIC_MAX) {
+	// 	CMN_SET_RESULT(result, GPU_UNSUPPORTED_OPERATION);
+	// 	return false;
+	// }
 
 	CMN_SET_RESULT(result, GPU_SUCCESS);
 	return true;
@@ -325,15 +325,15 @@ bool mtl4ValidateGpuWaitBefore(GpuCommandBuffer cb, GpuStage after, void* ptrGpu
 	(void)value;
 	(void)hazards;
 
-	if (op != GPU_OP_GREATER_EQUAL) {
-		CMN_SET_RESULT(result, GPU_UNSUPPORTED_OPERATION);
-		return false;
-	}
+	// if (op != GPU_OP_GREATER_EQUAL) {
+	// 	CMN_SET_RESULT(result, GPU_UNSUPPORTED_OPERATION);
+	// 	return false;
+	// }
 
-	if (mask != GPU_DEFAULT_WAIT_MASK) {
-		CMN_SET_RESULT(result, GPU_UNSUPPORTED_OPERATION);
-		return false;
-	}
+	// if (mask != GPU_DEFAULT_WAIT_MASK) {
+	// 	CMN_SET_RESULT(result, GPU_UNSUPPORTED_OPERATION);
+	// 	return false;
+	// }
 
 	CMN_SET_RESULT(result, GPU_SUCCESS);
 	return true;

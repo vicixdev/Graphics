@@ -13,38 +13,34 @@
 struct Mtl4CommandBufferMetadata;
 
 typedef struct Mtl4EventStorage {
-	CmnPage		page;
-	CmnArena	arena;
+	uint64_t*	signaledValuesUploadBuffer;
+	void*		signaledValuesGpuBuffer;
+	size_t		uploadBufferSize;
+	size_t		uploadBufferUsed;
 
-	id<MTLResidencySet> uploadBufferResidencySet;
-	id<MTLBuffer>	signaledValuesUploadBuffer;
-	uint64_t	uploadBufferSize;
-	uint64_t	uploadBufferUsed;
-
-	CmnPointerMap	<id<MTLEvent>>	lookup;
-	CmnStorageSync	sync;
+	GpuPipeline	waitPipelines[GPU_OP_ALWAYS + 1];
+	GpuPipeline	signalPipelines[GPU_SIGNAL_ATOMIC_OR + 1];
 } Mtl4EventStorage;
 extern Mtl4EventStorage gMtl4EventStorage;
 
 void mtl4InitEventStorage(GpuResult* result);
 void mtl4FiniEventStorage(void);
 
-id<MTLEvent> mtl4AcquireEventOf(void* gpuPtr);
-id<MTLEvent> mtl4AcquireOrCreateEventFor(void* gpuPtr, GpuResult* result);
-void mtl4ReleaseEvent(void);
-
 void mtl4SignalEvent(
-	Mtl4CommandBufferMetadata* commandBuffer,
-	GpuStage before,
+	GpuCommandBuffer commandBuffer,
+	GpuStage after,
+	GpuSignal signal,
 	void* gpuPtr,
 	uint64_t value,
 	GpuResult* result
 );
 void mtl4WaitEvent(
-	Mtl4CommandBufferMetadata* commandBuffer,
-	GpuStage after,
+	GpuCommandBuffer commandBuffer,
+	GpuStage before,
+	GpuOp waitOp,
 	void* gpuPtr,
 	uint64_t value,
+	uint64_t mask,
 	GpuResult* result
 );
 

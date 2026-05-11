@@ -35,3 +35,6 @@
 #include <lib/metal4/validation.mm>
 #include <lib/metal4/deletion_manager.cpp>
 
+#include <lib/metal4/shaders/wait.cpp>
+#include <lib/metal4/shaders/signal.cpp>
+
