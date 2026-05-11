@@ -43,6 +43,8 @@ typedef struct Mtl4GraphicsPipelineMetadata {
 typedef struct Mtl4ComputePipelineMetadata {
 	// Final
 	id<MTLComputePipelineState> pso;
+	// Final
+	uint32_t groupSize[3];
 } Mtl4ComputePipelineMetadata;
 
 typedef struct Mtl4MeshletPipelineMetadata {
@@ -89,6 +91,7 @@ void mtl4FiniPipelineStorage(void);
 GpuPipeline mtl4CreateComputePipeline(
 	const uint8_t* ir, size_t irSize,
 	const void* constants, size_t constantsSize,
+	uint32_t groupSize[3],
 	GpuResult* result
 );
 GpuPipeline mtl4CreateRenderPipeline(
@@ -112,7 +115,7 @@ Mtl4CompiledIr mtl4GetOrCompileIr(const uint8_t* ir, size_t irSize, GpuResult* r
 
 Mtl4Function mtl4CreateFunction(Mtl4CompiledIr* function, const void* constants, size_t constantsSize, NSString* name, GpuResult* result);
 
-Mtl4Pipeline mtl4CreateComputePipeline(Mtl4Function function, GpuResult* result);
+Mtl4Pipeline mtl4CreateComputePipeline(Mtl4Function function, uint32_t groupSize[3], GpuResult* result);
 Mtl4Pipeline mtl4CreateGraphicsPipeline(Mtl4Function vertex, Mtl4Function fragment, GpuResult* result);
 Mtl4Pipeline mtl4CreateMeshletPipeline(Mtl4Function meshlet, Mtl4Function fragment, GpuResult* result);
 

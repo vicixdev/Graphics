@@ -73,6 +73,7 @@ void mtl4FiniPipelineStorage(void) {
 GpuPipeline mtl4CreateComputePipeline(
 	const uint8_t* ir, size_t irSize,
 	const void* constants, size_t constantsSize,
+	uint32_t groupSize[3],
 	GpuResult* result
 ) {
 	GpuResult localResult;
@@ -89,7 +90,7 @@ GpuPipeline mtl4CreateComputePipeline(
 		return {};
 	}
 	
-	Mtl4Pipeline pipeline = mtl4CreateComputePipeline(function, &localResult);
+	Mtl4Pipeline pipeline = mtl4CreateComputePipeline(function, groupSize, &localResult);
 	if (localResult != GPU_SUCCESS) {
 		mtl4DestroyFunction(function);
 
@@ -318,7 +319,8 @@ Mtl4Function mtl4CreateFunction(Mtl4CompiledIr* function, const void* constants,
 	return metadata;
 }
 
-Mtl4Pipeline mtl4CreateComputePipeline(Mtl4Function function, GpuResult* result) {
+Mtl4Pipeline mtl4CreateComputePipeline(Mtl4Function function, uint32_t groupSize[3], GpuResult* result) {
+	
 	CmnResult localResult;
 	CmnScopedStorageSyncLockWrite guard(&gMtl4PipelineStorage.sync);
 
@@ -338,6 +340,7 @@ Mtl4Pipeline mtl4CreateComputePipeline(Mtl4Function function, GpuResult* result)
 	Mtl4PipelineMetadata metadata = {};
 	metadata.type			= MTL4_PIPELINE_COMPUTE;
 	metadata.compute.pso		= pso;
+	memcpy(metadata.compute.groupSize, groupSize, sizeof(uint32_t[3]));
 
 	Mtl4Pipeline pipeline = cmnInsert(&gMtl4PipelineStorage.pipelines, metadata, &localResult);
 	if (localResult != CMN_SUCCESS) {

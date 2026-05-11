@@ -428,7 +428,7 @@ void mtl4Dispatch(GpuCommandBuffer cb, void* dataGpu, uint32_t gridDimensions[3]
 	// TODO: Get groupSize from the pipeline... In some way...
 	[metadata->computeEncoder
 		dispatchThreadgroups:MTLSizeMake(gridDimensions[0], gridDimensions[1], gridDimensions[2])
-		threadsPerThreadgroup:MTLSizeMake(1, 1, 1)];
+		threadsPerThreadgroup:MTLSizeMake(pipelineMetadata->compute.groupSize[0], pipelineMetadata->compute.groupSize[1], pipelineMetadata->compute.groupSize[2])];
 
 	CMN_SET_RESULT(result, GPU_SUCCESS);
 	return;

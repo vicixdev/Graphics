@@ -25,6 +25,7 @@ typedef struct GpuBaseLayer {
 	GpuPipeline (*gpuCreateComputePipeline)(
 		const uint8_t* ir, size_t irSize,
 		const void* constants, size_t constantsSize,
+		uint32_t groupSize[3],
 		GpuResult* result
 	);
 	GpuPipeline (*gpuCreateRenderPipeline)(

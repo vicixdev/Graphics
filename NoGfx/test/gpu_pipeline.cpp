@@ -19,7 +19,8 @@ void checkGpuCreateComputePipeline(Test* test) {
 	size_t irSize = 0;
 	TEST_ASSERT(test, loadBinaryFile("build/compute.metallib", &ir, &irSize));
 
-	GpuPipeline pipeline = gpuCreateComputePipeline(ir, irSize, nullptr, 0, &result);
+	uint32_t groupSize[3] = { 1, 1, 1 };
+	GpuPipeline pipeline = gpuCreateComputePipeline(ir, irSize, nullptr, 0, groupSize, &result);
 
 	TEST_ASSERT(test, result == GPU_SUCCESS);
 	TEST_ASSERT(test, pipeline != 0);
@@ -44,7 +45,8 @@ void checkGpuCreateComputePipelineWithConstants(Test* test) {
 	GpuFunctionConstants constants = {};
 	constants.scale = 2.0f;
 
-	GpuPipeline pipeline = gpuCreateComputePipeline(ir, irSize, &constants, sizeof(constants), &result);
+	uint32_t groupSize[3] = { 1, 1, 1 };
+	GpuPipeline pipeline = gpuCreateComputePipeline(ir, irSize, &constants, sizeof(constants), groupSize, &result);
 
 	TEST_ASSERT(test, result == GPU_SUCCESS);
 	TEST_ASSERT(test, pipeline != 0);
@@ -63,7 +65,8 @@ void checkGpuCreateComputePipelineInvalidIr(Test* test) {
 	}
 
 	const uint8_t ir[] = { 0x13, 0x37, 0x00, 0x42 };
-	GpuPipeline pipeline = gpuCreateComputePipeline(ir, sizeof(ir), nullptr, 0, &result);
+	uint32_t groupSize[3] = { 1, 1, 1 };
+	GpuPipeline pipeline = gpuCreateComputePipeline(ir, sizeof(ir), nullptr, 0, groupSize, &result);
 
 	TEST_ASSERT(test, result == GPU_PIPELINE_IR_VALIDATION_FAILED);
 	TEST_ASSERT(test, pipeline == 0);
@@ -210,13 +213,15 @@ static void* gpuPipelineStressThreadProc(void* ptr) {
 
 	gpuWaitForStressStart(context->gate);
 
+	uint32_t groupSize[3] = { 1, 1, 1 };
+
 	for (size_t i = 0; i < context->iterations; i++) {
 		GpuResult pipelineResult = GPU_GENERAL_ERROR;
 		GpuPipeline pipeline = 0;
 
 		switch (i % 3u) {
 			case 0u:
-				pipeline = gpuCreateComputePipeline(context->computeIr, context->computeIrSize, &context->constants, sizeof(context->constants), &pipelineResult);
+				pipeline = gpuCreateComputePipeline(context->computeIr, context->computeIrSize, &context->constants, sizeof(context->constants), groupSize, &pipelineResult);
 				break;
 			case 1u:
 				pipeline = gpuCreateRenderPipeline(
