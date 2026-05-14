@@ -62,9 +62,9 @@ int main(void) {
 	
 	float data[8] = { 0, 1, 2, 3, 4, 5, 6, 7 };
 
-	void* privateBuffer	= gpuMalloc(sizeof(data), 4, GPU_MEMORY_GPU, NULL);
-	void* uploadBuffer	= gpuMalloc(sizeof(data), 4, GPU_MEMORY_DEFAULT, NULL);
-	void* downloadBuffer	= gpuMalloc(sizeof(data), 4, GPU_MEMORY_READBACK, NULL);
+	void* privateBuffer		= gpuMalloc(sizeof(data), 4, GPU_MEMORY_GPU, NULL);
+	void* uploadBuffer		= gpuMalloc(sizeof(data), 4, GPU_MEMORY_DEFAULT, NULL);
+	void* downloadBuffer		= gpuMalloc(sizeof(data), 4, GPU_MEMORY_READBACK, NULL);
 
 	void* deviceUploadBuffer	= gpuHostToDevicePointer(uploadBuffer, NULL);
 	void* deviceDownloadBuffer	= gpuHostToDevicePointer(downloadBuffer, NULL);

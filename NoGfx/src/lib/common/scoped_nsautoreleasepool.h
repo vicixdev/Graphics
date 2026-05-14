@@ -3,7 +3,7 @@
 
 #include <lib/common/common.h>
 #ifndef CMN_PLATFORM_DARWIN
-	#panic CmnScopedNSaCmnScopedNSAutoreleasePool is darwin-exclusive.
+	#panic CmnScopedNSAutoreleasePool is darwin-exclusive.
 #endif
 
 #include <Foundation/Foundation.h>

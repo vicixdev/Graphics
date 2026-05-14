@@ -180,8 +180,8 @@ void mtl4MemCpy(GpuCommandBuffer cb, void* destGpu, void* srcGpu, size_t size, G
 
 	mtl4EnsureValidComputeEndoderFor(metadata);
 	[metadata->computeEncoder
-	 	copyFromBuffer:sourceMetadata->buffer sourceOffset:destinationOffset
-		toBuffer:destinationMetadata->buffer destinationOffset:sourceOffset
+	 	copyFromBuffer:sourceMetadata->buffer sourceOffset:sourceOffset
+		toBuffer:destinationMetadata->buffer destinationOffset:destinationOffset
 		size:size];
 
 	CMN_SET_RESULT(result, GPU_SUCCESS);
@@ -330,6 +330,8 @@ void mtl4SetPipeline(GpuCommandBuffer cb, GpuPipeline pipeline, GpuResult* resul
 	// }
 
 	metadata->pipeline = mtl4GpuPipelineToHandle(pipeline);
+
+
 }
 
 void mtl4Barrier(GpuCommandBuffer cb, GpuStageFlags before, GpuStageFlags after, GpuHazardFlags hazards, GpuResult* result) {

@@ -96,7 +96,8 @@ int main(void) {
 		return -1;
 	}
 
-	GpuPipeline pipeline = gpuCreateComputePipeline(addPipelineIr, addPipelineIrSize, NULL, 0, NULL);
+	uint32_t groupSize[3] = { 1, 1, 1 };
+	GpuPipeline pipeline = gpuCreateComputePipeline(addPipelineIr, addPipelineIrSize, NULL, 0, groupSize, NULL);
 
 	uint32_t* leftBuffer = (uint32_t*)gpuMalloc(ADD_VECTOR_SIZE, 0, GPU_MEMORY_DEFAULT, NULL);
 	uint32_t* rightBuffer = (uint32_t*)gpuMalloc(ADD_VECTOR_SIZE, 0, GPU_MEMORY_DEFAULT, NULL);

@@ -38,6 +38,7 @@ typedef enum GpuResult {
 
 	GPU_COUND_NOT_CREATE_QUEUE,
 	GPU_COUND_NOT_CREATE_COMMAND_BUFFER,
+	GPU_COULD_NOT_CREATE_NATIVE_OBJECT,
 
 	GPU_UNSUPPORTED_OPERATION,
 
@@ -331,6 +332,11 @@ typedef struct GpuLayer {
 		GpuResult* result
 	);
 	bool (*gpuFreePipeline)(GpuPipeline pipeline);
+
+	bool (*gpuCreateDepthStencilState)(const GpuDepthStencilDesc* desc, GpuResult* result);
+	bool (*gpuCreateBlendState)(const GpuBlendDesc* desc, GpuResult* result);
+	bool (*gpuFreeDepthStencilState)(GpuDepthStencilState state);
+	bool (*gpuFreeBlendState)(GpuBlendState state);
 
 	bool (*gpuCreateQueue)(GpuResult* result);
 	bool (*gpuStartCommandEncoding)(GpuQueue queue, GpuResult* result);

@@ -44,6 +44,12 @@ typedef struct GpuBaseLayer {
 	);
 	void (*gpuFreePipeline)(GpuPipeline pipeline);
 
+	GpuDepthStencilState (*gpuCreateDepthStencilState)(const GpuDepthStencilDesc* desc, GpuResult* result);
+	GpuBlendState (*gpuCreateBlendState)(const GpuBlendDesc* desc, GpuResult* result);
+	void (*gpuFreeDepthStencilState)(GpuDepthStencilState state);
+	void (*gpuFreeBlendState)(GpuBlendState state);
+
+
 	GpuQueue (*gpuCreateQueue)(GpuResult* result);
 	GpuCommandBuffer (*gpuStartCommandEncoding)(GpuQueue queue, GpuResult* result);
 	void (*gpuSubmit)(GpuQueue queue, GpuCommandBuffer* commandBuffers, size_t commandBufferCount, GpuResult* result);

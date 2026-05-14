@@ -8,6 +8,8 @@
 #include <lib/metal4/queue.h>
 #include <lib/metal4/command_buffers.h>
 #include <lib/metal4/semaphores.h>
+#include <lib/metal4/depthstencilstates.h>
+#include <lib/metal4/blend_states.h>
 #include <lib/metal4/validation.h>
 
 GpuBaseLayer gMtl4BaseLayer = {
@@ -26,6 +28,10 @@ GpuBaseLayer gMtl4BaseLayer = {
 	/*gpuCreateRenderPipeline=*/	mtl4CreateRenderPipeline,
 	/*gpuCreateMeshletPipeline=*/	mtl4CreateMeshletPipeline,
 	/*gpuFreePipeline=*/		mtl4FreePipeline,
+	/*gpuCreateDepthStencilState=*/	mtl4CreateDepthStencilState,
+	/*gpuCreateBlendState=*/	mtl4CreateBlendState,
+	/*gpuFreeDepthStencilState=*/	mtl4FreeDepthStencilState,
+	/*gpuFreeBlendState=*/		mtl4FreeBlendState,
 	/*gpuCreateQueue=*/		mtl4CreateQueue,
 	/*gpuStartCommandEncoding=*/	mtl4StartCommandEncoding,
 	/*gpuSubmit=*/			mtl4Submit,
@@ -59,6 +65,10 @@ GpuLayer gMtl4ValidationLayer = {
 	/*gpuCreateRenderPipeline=*/	nullptr,
 	/*gpuCreateMeshletPipeline=*/	nullptr,
 	/*gpuFreePipeline=*/		nullptr,
+	/*gpuCreateDepthStencilState=*/	nullptr,
+	/*gpuCreateBlendState=*/	nullptr,
+	/*gpuFreeDepthStencilState=*/	nullptr,
+	/*gpuFreeBlendState=*/		nullptr,
 	/*gpuCreateQueue=*/		nullptr,
 	/*gpuStartCommandEncoding=*/	nullptr,
 	/*gpuSubmit=*/			nullptr,

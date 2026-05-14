@@ -83,3 +83,24 @@ const MTLResourceOptions gMtl4ResourceOptionsFor[] = {
 	/*GPU_MEMORY_READBACK=*/	MTLResourceStorageModeShared | MTLResourceCPUCacheModeDefaultCache,
 };
 
+const MTLCompareFunction gMtl4GpuOpToMtlCompareFunction[] {
+	/*GPU_OP_NEVER=*/		MTLCompareFunctionNever,
+	/*GPU_OP_LESS=*/		MTLCompareFunctionLess,
+	/*GPU_OP_EQUAL=*/		MTLCompareFunctionEqual,
+	/*GPU_OP_LESS_EQUAL=*/		MTLCompareFunctionLessEqual,
+	/*GPU_OP_GREATER=*/		MTLCompareFunctionGreater,
+	/*GPU_OP_NOT_EQUAL=*/		MTLCompareFunctionNotEqual,
+	/*GPU_OP_GREATER_EQUAL=*/	MTLCompareFunctionGreaterEqual,
+	/*GPU_OP_ALWAYS=*/		MTLCompareFunctionAlways,
+};
+
+const MTLStencilOperation gMtl4GpuOpToMtlStencilOperation[] = {
+	/*GPU_OP_NEVER=*/		MTLStencilOperationKeep,
+	/*GPU_OP_LESS=*/		MTLStencilOperationZero,
+	/*GPU_OP_EQUAL=*/		MTLStencilOperationReplace,
+	/*GPU_OP_LESS_EQUAL=*/		MTLStencilOperationIncrementClamp,
+	/*GPU_OP_GREATER=*/		MTLStencilOperationDecrementClamp,
+	/*GPU_OP_NOT_EQUAL=*/		MTLStencilOperationInvert,
+	/*GPU_OP_GREATER_EQUAL=*/	MTLStencilOperationIncrementWrap,
+	/*GPU_OP_ALWAYS=*/		MTLStencilOperationDecrementWrap,
+};

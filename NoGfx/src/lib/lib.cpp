@@ -135,6 +135,26 @@ void gpuFreePipeline(GpuPipeline pipeline) {
 	GPU_LAYERED_CALL(gpuFreePipeline, pipeline);
 }
 
+GpuDepthStencilState gpuCreateDepthStencilState(const GpuDepthStencilDesc* desc, GpuResult* result) {
+	GPU_LAYERED_CALL(gpuCreateDepthStencilState, desc, result);
+
+	return {};
+}
+
+GpuBlendState gpuCreateBlendState(const GpuBlendDesc* desc, GpuResult* result) {
+	GPU_LAYERED_CALL(gpuCreateBlendState, desc, result);
+
+	return {};
+}
+
+void gpuFreeDepthStencilState(GpuDepthStencilState state) {
+	GPU_LAYERED_CALL(gpuFreeDepthStencilState, state);
+}
+
+void gpuFreeBlendState(GpuBlendState state) {
+	GPU_LAYERED_CALL(gpuFreeBlendState, state);
+}
+
 GpuQueue gpuCreateQueue(GpuResult* result) {
 	GPU_LAYERED_CALL(gpuCreateQueue, result);
 
