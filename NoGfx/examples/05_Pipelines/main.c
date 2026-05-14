@@ -115,6 +115,8 @@ int main(void) {
 	GpuSemaphore semaphore = gpuCreateSemaphore(0, NULL);
 
 	{
+		printf("Performing [0,1024) + [1024, 2048) via a direct dispatch...\n");
+
 		for (size_t i = 0; i < ADD_VECTOR_LEN; i++) {
 			leftBuffer[i] = i;
 			rightBuffer[i] = ADD_VECTOR_LEN + i;
@@ -139,6 +141,8 @@ int main(void) {
 	}
 
 	{
+		printf("Performing [2048, 3072) + [1024, 2048) via an indirect dispatch...\n");
+
 		for (size_t i = 0; i < ADD_VECTOR_LEN; i++) {
 			leftBuffer[i] = ADD_VECTOR_LEN * 2 + i;
 			rightBuffer[i] = ADD_VECTOR_LEN + i;

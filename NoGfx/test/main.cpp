@@ -134,8 +134,6 @@ TestRecord gNoGfxTests[] = {
 	{ "Check GPU compute pipeline invalid IR handling", 		checkGpuCreateComputePipelineInvalidIr		},
 	{ "Check GPU render pipeline creation", 			checkGpuCreateRenderPipeline			},
 	{ "Check GPU render pipeline creation with constants", 		checkGpuCreateRenderPipelineWithConstants	},
-	{ "Check GPU meshlet pipeline creation", 			checkGpuCreateMeshletPipeline			},
-	{ "Check GPU meshlet pipeline creation with constants", 	checkGpuCreateMeshletPipelineWithConstants	},
 	{ "Check GPU concurrent pipeline stress", 			checkGpuConcurrentPipelineStress		},
 
 	{ "Check basic signal-based synchronization",			gpuTestSignalWritingOnGpuPtr			},

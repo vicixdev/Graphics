@@ -33,6 +33,7 @@ typedef struct GpuBaseLayer {
 		const uint8_t* fragmentIr, size_t fragmentIrSize,
 		const void* vertexConstants, size_t vertexConstantsSize,
 		const void* fragmentConstants, size_t fragmentConstantsSize,
+		const GpuRasterDesc* desc,
 		GpuResult* result
 	);
 	GpuPipeline (*gpuCreateMeshletPipeline)(
@@ -40,6 +41,7 @@ typedef struct GpuBaseLayer {
 		const uint8_t* fragmentIr, size_t fragmentIrSize,
 		const void* meshletConstants, size_t meshletConstantsSize,
 		const void* fragmentConstants, size_t fragmentConstantsSize,
+		const GpuRasterDesc* desc,
 		GpuResult* result
 	);
 	void (*gpuFreePipeline)(GpuPipeline pipeline);

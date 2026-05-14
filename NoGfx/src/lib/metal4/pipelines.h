@@ -33,13 +33,6 @@ typedef struct Mtl4Function {
 	MTL4FunctionDescriptor*	descriptor;
 } Mtl4Function;
 
-typedef struct Mtl4GraphicsPipelineMetadata {
-	// Final
-	Mtl4Function vertex;
-	// Final
-	Mtl4Function fragment;
-} Mtl4GraphicsPipelineMetadata;
-
 typedef struct Mtl4ComputePipelineMetadata {
 	// Final
 	id<MTLComputePipelineState> pso;
@@ -47,11 +40,18 @@ typedef struct Mtl4ComputePipelineMetadata {
 	uint32_t groupSize[3];
 } Mtl4ComputePipelineMetadata;
 
+typedef struct Mtl4GraphicsPipelineMetadata {
+	// Final
+	id<MTLRenderPipelineState> pso;
+	// Final
+	GpuRasterDesc	desc;
+} Mtl4GraphicsPipelineMetadata;
+
 typedef struct Mtl4MeshletPipelineMetadata {
 	// Final
-	Mtl4Function meshlet;
+	id<MTLRenderPipelineState> pso;
 	// Final
-	Mtl4Function fragment;
+	GpuRasterDesc	desc;
 } Mtl4MeshletPipelineMetadata;
 
 typedef struct Mtl4PipelineMetadata {
@@ -99,6 +99,7 @@ GpuPipeline mtl4CreateRenderPipeline(
 	const uint8_t* fragmentIr, size_t fragmentIrSize,
 	const void* vertexConstants, size_t vertexConstantsSize,
 	const void* fragmentConstants, size_t fragmentConstantsSize,
+	const GpuRasterDesc* desc,
 	GpuResult* result
 );
 GpuPipeline mtl4CreateMeshletPipeline(
@@ -106,6 +107,7 @@ GpuPipeline mtl4CreateMeshletPipeline(
 	const uint8_t* fragmentIr, size_t fragmentIrSize,
 	const void* meshletConstants, size_t meshletConstantsSize,
 	const void* fragmentConstants, size_t fragmentConstantsSize,
+	const GpuRasterDesc* desc,
 	GpuResult* result
 );
 void mtl4FreePipeline(GpuPipeline pipeline);
@@ -116,8 +118,8 @@ Mtl4CompiledIr mtl4GetOrCompileIr(const uint8_t* ir, size_t irSize, GpuResult* r
 Mtl4Function mtl4CreateFunction(Mtl4CompiledIr* function, const void* constants, size_t constantsSize, NSString* name, GpuResult* result);
 
 Mtl4Pipeline mtl4CreateComputePipeline(Mtl4Function function, uint32_t groupSize[3], GpuResult* result);
-Mtl4Pipeline mtl4CreateGraphicsPipeline(Mtl4Function vertex, Mtl4Function fragment, GpuResult* result);
-Mtl4Pipeline mtl4CreateMeshletPipeline(Mtl4Function meshlet, Mtl4Function fragment, GpuResult* result);
+Mtl4Pipeline mtl4CreateGraphicsPipeline(Mtl4Function vertex, Mtl4Function fragment, const GpuRasterDesc* desc, GpuResult* result);
+Mtl4Pipeline mtl4CreateMeshletPipeline(Mtl4Function meshlet, Mtl4Function fragment, const GpuRasterDesc* desc, GpuResult* result);
 
 Mtl4PipelineMetadata* mtl4AcquirePipelineMetadataFrom(Mtl4Pipeline pipeline);
 void mtl4ReleasePipelineMetadata(void);

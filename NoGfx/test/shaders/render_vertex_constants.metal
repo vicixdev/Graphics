@@ -2,7 +2,7 @@
 
 using namespace metal;
 
-constant float vertexScale [[function_constant(0)]];
+constant uint vertexScale [[function_constant(0)]];
 
 struct VertexOut {
 	float4 position [[position]];
@@ -10,6 +10,6 @@ struct VertexOut {
 
 [[host_name("main")]] vertex VertexOut vertexMain(uint vertexId [[vertex_id]]) {
 	VertexOut out;
-	out.position = float4(float(vertexId) * vertexScale, 0.0, 0.0, 1.0);
+	out.position = float4(float(vertexId) * float(vertexScale), 0.0, 0.0, 1.0);
 	return out;
 }

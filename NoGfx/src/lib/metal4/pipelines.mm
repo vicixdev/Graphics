@@ -3,8 +3,10 @@
 #include <dispatch/dispatch.h>
 
 #include <lib/common/heap_allocator.h>
+#include <lib/common/scoped_nsautoreleasepool.h>
 #include <lib/metal4/context.h>
 #include <lib/metal4/deletion_manager.h>
+#include <lib/metal4/tables.h>
 
 Mtl4PipelineStorage gMtl4PipelineStorage;
 
@@ -76,6 +78,8 @@ GpuPipeline mtl4CreateComputePipeline(
 	uint32_t groupSize[3],
 	GpuResult* result
 ) {
+	CmnScopedNSAutoreleasePool pool;
+
 	GpuResult localResult;
 
 	Mtl4CompiledIr compiledIr = mtl4GetOrCompileIr(ir, irSize, &localResult);
@@ -107,8 +111,11 @@ GpuPipeline mtl4CreateRenderPipeline(
 	const uint8_t* fragmentIr, size_t fragmentIrSize,
 	const void* vertexConstants, size_t vertexConstantsSize,
 	const void* fragmentConstants, size_t fragmentConstantsSize,
+	const GpuRasterDesc* desc,
 	GpuResult* result
 ) {
+	CmnScopedNSAutoreleasePool pool;
+
 	GpuResult localResult;
 
 	Mtl4CompiledIr compiledVertexIr = mtl4GetOrCompileIr(vertexIr, vertexIrSize, &localResult);
@@ -137,7 +144,7 @@ GpuPipeline mtl4CreateRenderPipeline(
 		return {};
 	}
 	
-	Mtl4Pipeline pipeline = mtl4CreateGraphicsPipeline(vertexFunction, fragmentFunction, &localResult);
+	Mtl4Pipeline pipeline = mtl4CreateGraphicsPipeline(vertexFunction, fragmentFunction, desc, &localResult);
 	if (localResult != GPU_SUCCESS) {
 		mtl4DestroyFunction(vertexFunction);
 		mtl4DestroyFunction(fragmentFunction);
@@ -155,8 +162,11 @@ GpuPipeline mtl4CreateMeshletPipeline(
 	const uint8_t* fragmentIr, size_t fragmentIrSize,
 	const void* meshletConstants, size_t meshletConstantsSize,
 	const void* fragmentConstants, size_t fragmentConstantsSize,
+	const GpuRasterDesc* desc,
 	GpuResult* result
 ) {
+	CmnScopedNSAutoreleasePool pool;
+
 	GpuResult localResult;
 
 	Mtl4CompiledIr compiledMeshletIr = mtl4GetOrCompileIr(meshletIr, meshletIrSize, &localResult);
@@ -185,7 +195,7 @@ GpuPipeline mtl4CreateMeshletPipeline(
 		return {};
 	}
 	
-	Mtl4Pipeline pipeline = mtl4CreateMeshletPipeline(meshletFunction, fragmentFunction, &localResult);
+	Mtl4Pipeline pipeline = mtl4CreateMeshletPipeline(meshletFunction, fragmentFunction, desc, &localResult);
 	if (localResult != GPU_SUCCESS) {
 		mtl4DestroyFunction(meshletFunction);
 		mtl4DestroyFunction(fragmentFunction);
@@ -299,18 +309,16 @@ Mtl4Function mtl4CreateFunction(Mtl4CompiledIr* function, const void* constants,
 	if (constants == nullptr || constantsSize == 0) {
 		metadata.descriptor = baseDescriptor;
 	} else {
+		// TODO: Do not leak the constant values object.
 		MTLFunctionConstantValues* constantValues = [MTLFunctionConstantValues new];
 
-		for (size_t i = 0; i < (constantsSize / 8); i++) {
-			[constantValues setConstantValue:constants type:MTLDataTypeULong atIndex:i];
+		for (size_t i = 0; i < (constantsSize / 4); i++) {
+			[constantValues setConstantValue:constants type:MTLDataTypeUInt atIndex:i];
 		}
 
 		MTL4SpecializedFunctionDescriptor* functionDescriptor = [MTL4SpecializedFunctionDescriptor new];
 		functionDescriptor.functionDescriptor	= baseDescriptor;
 		functionDescriptor.constantValues	= constantValues;
-
-		[baseDescriptor release];
-		[constantValues release];
 
 		metadata.descriptor = functionDescriptor;
 	}
@@ -324,8 +332,7 @@ Mtl4Pipeline mtl4CreateComputePipeline(Mtl4Function function, uint32_t groupSize
 	CmnResult localResult;
 	CmnScopedStorageSyncLockWrite guard(&gMtl4PipelineStorage.sync);
 
-	MTL4ComputePipelineDescriptor* psoDesc = [MTL4ComputePipelineDescriptor new];
-	defer ([psoDesc release]);
+	MTL4ComputePipelineDescriptor* psoDesc = [[MTL4ComputePipelineDescriptor new] autorelease];
 	psoDesc.computeFunctionDescriptor = function.descriptor;
 
 	id<MTLComputePipelineState> pso = [gMtl4PipelineStorage.compiler
@@ -352,14 +359,43 @@ Mtl4Pipeline mtl4CreateComputePipeline(Mtl4Function function, uint32_t groupSize
 	return pipeline;
 }
 
-Mtl4Pipeline mtl4CreateGraphicsPipeline(Mtl4Function vertex, Mtl4Function fragment, GpuResult* result) {
+Mtl4Pipeline mtl4CreateGraphicsPipeline(Mtl4Function vertex, Mtl4Function fragment, const GpuRasterDesc* desc, GpuResult* result) {
 	CmnResult localResult;
 	CmnScopedStorageSyncLockWrite guard(&gMtl4PipelineStorage.sync);
 
+	MTL4RenderPipelineDescriptor* pipelineDesc = [[MTL4RenderPipelineDescriptor new] autorelease];
+	pipelineDesc.vertexFunctionDescriptor = vertex.descriptor;
+	pipelineDesc.fragmentFunctionDescriptor = fragment.descriptor;
+	pipelineDesc.rasterSampleCount = desc->sampleCount;
+	pipelineDesc.alphaToCoverageState = desc->alphaToCoverage ? MTL4AlphaToCoverageStateEnabled : MTL4AlphaToCoverageStateDisabled;
+	pipelineDesc.inputPrimitiveTopology = MTLPrimitiveTopologyClassTriangle;
+	pipelineDesc.supportIndirectCommandBuffers = MTL4IndirectCommandBufferSupportStateEnabled;
+
+	for (size_t i = 0; i < desc->colorTargetCount; i++) {
+		const GpuColorTarget* colorTarget = &desc->colorTargets[i];
+
+		MTL4RenderPipelineColorAttachmentDescriptor* colorAttachment = [[MTL4RenderPipelineColorAttachmentDescriptor new] autorelease];
+		colorAttachment.pixelFormat = gMtl4GpuToMtlFormat[colorTarget->format];
+		colorAttachment.writeMask = colorTarget->writeMask;
+		colorAttachment.blendingState = MTL4BlendStateUnspecialized;
+		
+		pipelineDesc.colorAttachments[i] = colorAttachment;
+	}
+
+
+	id<MTLRenderPipelineState> pso = [gMtl4PipelineStorage.compiler
+		newRenderPipelineStateWithDescriptor:pipelineDesc
+		compilerTaskOptions:nil
+		error:nil];
+	if (pso == nil) {
+		CMN_SET_RESULT(result, GPU_PIPELINE_IR_VALIDATION_FAILED);
+		return {};
+	}
+
 	Mtl4PipelineMetadata metadata = {};
 	metadata.type = MTL4_PIPELINE_GRAPHICS;
-	metadata.graphics.vertex = vertex;
-	metadata.graphics.fragment = fragment;
+	metadata.graphics.pso = pso;
+	metadata.graphics.desc = *desc;
 
 	Mtl4Pipeline pipeline = cmnInsert(&gMtl4PipelineStorage.pipelines, metadata, &localResult);
 	if (localResult != CMN_SUCCESS) {
@@ -371,23 +407,14 @@ Mtl4Pipeline mtl4CreateGraphicsPipeline(Mtl4Function vertex, Mtl4Function fragme
 	return pipeline;
 }
 
-Mtl4Pipeline mtl4CreateMeshletPipeline(Mtl4Function meshlet, Mtl4Function fragment, GpuResult* result) {
-	CmnResult localResult;
-	CmnScopedStorageSyncLockWrite guard(&gMtl4PipelineStorage.sync);
+Mtl4Pipeline mtl4CreateMeshletPipeline(Mtl4Function meshlet, Mtl4Function fragment, const GpuRasterDesc* desc, GpuResult* result) {
+	(void)meshlet;
+	(void)fragment;
+	(void)desc;
+	(void)result;
 
-	Mtl4PipelineMetadata metadata = {};
-	metadata.type = MTL4_PIPELINE_MESHLET;
-	metadata.meshlet.meshlet = meshlet;
-	metadata.meshlet.fragment = fragment;
-
-	Mtl4Pipeline pipeline = cmnInsert(&gMtl4PipelineStorage.pipelines, metadata, &localResult);
-	if (localResult != CMN_SUCCESS) {
-		CMN_SET_RESULT(result, GPU_OUT_OF_CPU_MEMORY);
-		return {};
-	}
-
-	CMN_SET_RESULT(result, GPU_SUCCESS);
-	return pipeline;
+	CMN_SET_RESULT(result, GPU_UNSUPPORTED_OPERATION);
+	return {};
 }
 
 Mtl4PipelineMetadata* mtl4AcquirePipelineMetadataFrom(Mtl4Pipeline pipeline) {
@@ -437,13 +464,13 @@ void mtl4DestroyPipeline(Mtl4Pipeline pipeline) {
 			break;
 		}
 		case MTL4_PIPELINE_GRAPHICS: {
-			mtl4DestroyFunction(metadata.graphics.vertex);
-			mtl4DestroyFunction(metadata.graphics.fragment);
+			[metadata.graphics.pso release];
+
 			break;
 		}
 		case MTL4_PIPELINE_MESHLET: {
-			mtl4DestroyFunction(metadata.meshlet.meshlet);
-			mtl4DestroyFunction(metadata.meshlet.fragment);
+			[metadata.meshlet.pso release];
+
 			break;
 		}
 	}

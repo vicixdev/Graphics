@@ -98,6 +98,7 @@ GpuPipeline gpuCreateRenderPipeline(
 	const uint8_t* fragmentIr, size_t fragmentIrSize,
 	const void* vertexConstants, size_t vertexConstantsSize,
 	const void* fragmentConstants, size_t fragmentConstantsSize,
+	const GpuRasterDesc* desc,
 	GpuResult* result
 ) {
 	GPU_LAYERED_CALL(
@@ -106,6 +107,7 @@ GpuPipeline gpuCreateRenderPipeline(
 		fragmentIr, fragmentIrSize,
 		vertexConstants, vertexConstantsSize,
 		fragmentConstants, fragmentConstantsSize,
+		desc,
 		result
 	);
 
@@ -117,6 +119,7 @@ GpuPipeline gpuCreateMeshletPipeline(
 	const uint8_t* fragmentIr, size_t fragmentIrSize,
 	const void* meshletConstants, size_t meshletConstantsSize,
 	const void* fragmentConstants, size_t fragmentConstantsSize,
+	const GpuRasterDesc* desc,
 	GpuResult* result
 ) {
 	GPU_LAYERED_CALL(
@@ -125,6 +128,7 @@ GpuPipeline gpuCreateMeshletPipeline(
 		fragmentIr, fragmentIrSize,
 		meshletConstants, meshletConstantsSize,
 		fragmentConstants, fragmentConstantsSize,
+		desc,
 		result
 	)
 

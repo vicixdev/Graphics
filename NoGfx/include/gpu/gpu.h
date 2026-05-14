@@ -289,6 +289,7 @@ typedef struct GpuRasterDesc {
 	GpuFormat depthFormat /* = FORMAT_NONE */;
 	GpuFormat stencilFormat /* = FORMAT_NONE */;
 	GpuColorTarget* colorTargets /* = {} */;
+	size_t colorTargetCount;
 	GpuBlendDesc* blendstate /* = nullptr; */; // optional embedded blend state
 } GpuRasterDesc;
 
@@ -322,6 +323,7 @@ typedef struct GpuLayer {
 		const uint8_t* fragmentIr, size_t fragmentIrSize,
 		const void* vertexConstants, size_t vertexConstantsSize,
 		const void* fragmentConstants, size_t fragmentConstantsSize,
+		const GpuRasterDesc* desc,
 		GpuResult* result
 	);
 	bool (*gpuCreateMeshletPipeline)(
@@ -329,6 +331,7 @@ typedef struct GpuLayer {
 		const uint8_t* fragmentIr, size_t fragmentIrSize,
 		const void* meshletConstants, size_t meshletConstantsSize,
 		const void* fragmentConstants, size_t fragmentConstantsSize,
+		const GpuRasterDesc* desc,
 		GpuResult* result
 	);
 	bool (*gpuFreePipeline)(GpuPipeline pipeline);
@@ -401,6 +404,7 @@ GpuPipeline gpuCreateRenderPipeline(
 	const uint8_t* fragmentIr, size_t fragmentIrSize,
 	const void* vertexConstants, size_t vertexConstantsSize,
 	const void* fragmentConstants, size_t fragmentConstantsSize,
+	const GpuRasterDesc* desc,
 	GpuResult* result
 );
 GpuPipeline gpuCreateMeshletPipeline(
@@ -408,6 +412,7 @@ GpuPipeline gpuCreateMeshletPipeline(
 	const uint8_t* fragmentIr, size_t fragmentIrSize,
 	const void* meshletConstants, size_t meshletConstantsSize,
 	const void* fragmentConstants, size_t fragmentConstantsSize,
+	const GpuRasterDesc* desc,
 	GpuResult* result
 );
 void gpuFreePipeline(GpuPipeline pipeline);

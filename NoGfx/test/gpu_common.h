@@ -6,6 +6,10 @@
 #include <lib/common/atomic.h>
 #include <pthread.h>
 
+typedef struct GpuFunctionConstants {
+	float scale;
+} GpuFunctionConstants;
+
 typedef struct GpuStressGate {
 	uint32_t ready;
 	uint32_t start;

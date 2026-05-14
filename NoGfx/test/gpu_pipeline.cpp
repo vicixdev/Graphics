@@ -1,12 +1,24 @@
+#include "gpu/gpu.h"
 #include "gpu_common.h"
 
 #include <pthread.h>
 #include <sched.h>
 #include <lib/common/atomic.h>
 
-typedef struct GpuFunctionConstants {
-	float scale;
-} GpuFunctionConstants;
+void createDummyRasterDesc(GpuRasterDesc* desc) {
+	*desc = {};
+
+	desc->topology = GPU_TOPOLOGY_TRIANGLE_LIST;
+	desc->cull = GPU_CULL_ALL;
+	desc->alphaToCoverage = false;
+	desc->supportDualSourceBlending = false;
+	desc->sampleCount = 1;
+	desc->depthFormat = GPU_FORMAT_NONE;
+	desc->stencilFormat = GPU_FORMAT_NONE;
+	desc->colorTargets = nullptr;
+	desc->colorTargetCount = 0;
+	desc->blendstate = nullptr;
+}
 
 void checkGpuCreateComputePipeline(Test* test) {
 	GpuResult result;
@@ -89,7 +101,9 @@ void checkGpuCreateRenderPipeline(Test* test) {
 	size_t fragmentIrSize = 0;
 	TEST_ASSERT(test, loadBinaryFile("build/render_fragment.metallib", &fragmentIr, &fragmentIrSize));
 
-	GpuPipeline pipeline = gpuCreateRenderPipeline(vertexIr, vertexIrSize, fragmentIr, fragmentIrSize, nullptr, 0, nullptr, 0, &result);
+	GpuRasterDesc rasterDesc;
+	createDummyRasterDesc(&rasterDesc);
+	GpuPipeline pipeline = gpuCreateRenderPipeline(vertexIr, vertexIrSize, fragmentIr, fragmentIrSize, nullptr, 0, nullptr, 0, &rasterDesc, &result);
 
 	TEST_ASSERT(test, result == GPU_SUCCESS);
 	TEST_ASSERT(test, pipeline != 0);
@@ -121,7 +135,9 @@ void checkGpuCreateRenderPipelineWithConstants(Test* test) {
 	GpuFunctionConstants fragmentConstants = {};
 	fragmentConstants.scale = 0.25f;
 
-	GpuPipeline pipeline = gpuCreateRenderPipeline(vertexIr, vertexIrSize, fragmentIr, fragmentIrSize, &vertexConstants, sizeof(vertexConstants), &fragmentConstants, sizeof(fragmentConstants), &result);
+	GpuRasterDesc rasterDesc;
+	createDummyRasterDesc(&rasterDesc);
+	GpuPipeline pipeline = gpuCreateRenderPipeline(vertexIr, vertexIrSize, fragmentIr, fragmentIrSize, &vertexConstants, sizeof(vertexConstants), &fragmentConstants, sizeof(fragmentConstants), &rasterDesc, &result);
 
 	TEST_ASSERT(test, result == GPU_SUCCESS);
 	TEST_ASSERT(test, pipeline != 0);
@@ -133,64 +149,6 @@ void checkGpuCreateRenderPipelineWithConstants(Test* test) {
 	gpuDeinit();
 }
 
-void checkGpuCreateMeshletPipeline(Test* test) {
-	GpuResult result;
-	if (!initGpuAndSelectFirstDevice(&result)) {
-		TEST_ASSERT(test, result == GPU_SUCCESS);
-		return;
-	}
-
-	uint8_t* meshletIr = nullptr;
-	size_t meshletIrSize = 0;
-	TEST_ASSERT(test, loadBinaryFile("build/meshlet.metallib", &meshletIr, &meshletIrSize));
-
-	uint8_t* fragmentIr = nullptr;
-	size_t fragmentIrSize = 0;
-	TEST_ASSERT(test, loadBinaryFile("build/render_fragment.metallib", &fragmentIr, &fragmentIrSize));
-
-	GpuPipeline pipeline = gpuCreateMeshletPipeline(meshletIr, meshletIrSize, fragmentIr, fragmentIrSize, nullptr, 0, nullptr, 0, &result);
-
-	TEST_ASSERT(test, result == GPU_SUCCESS);
-	TEST_ASSERT(test, pipeline != 0);
-
-	freeBinaryFile(meshletIr);
-	freeBinaryFile(fragmentIr);
-
-	gpuFreePipeline(pipeline);
-	gpuDeinit();
-}
-
-void checkGpuCreateMeshletPipelineWithConstants(Test* test) {
-	GpuResult result;
-	if (!initGpuAndSelectFirstDevice(&result)) {
-		TEST_ASSERT(test, result == GPU_SUCCESS);
-		return;
-	}
-
-	uint8_t* meshletIr = nullptr;
-	size_t meshletIrSize = 0;
-	TEST_ASSERT(test, loadBinaryFile("build/meshlet_constants.metallib", &meshletIr, &meshletIrSize));
-
-	uint8_t* fragmentIr = nullptr;
-	size_t fragmentIrSize = 0;
-	TEST_ASSERT(test, loadBinaryFile("build/render_fragment_constants.metallib", &fragmentIr, &fragmentIrSize));
-
-	GpuFunctionConstants meshletConstants = {};
-	meshletConstants.scale = 1.0f;
-	GpuFunctionConstants fragmentConstants = {};
-	fragmentConstants.scale = 0.5f;
-
-	GpuPipeline pipeline = gpuCreateMeshletPipeline(meshletIr, meshletIrSize, fragmentIr, fragmentIrSize, &meshletConstants, sizeof(meshletConstants), &fragmentConstants, sizeof(fragmentConstants), &result);
-
-	TEST_ASSERT(test, result == GPU_SUCCESS);
-	TEST_ASSERT(test, pipeline != 0);
-
-	freeBinaryFile(meshletIr);
-	freeBinaryFile(fragmentIr);
-
-	gpuFreePipeline(pipeline);
-	gpuDeinit();
-}
 
 typedef struct GpuPipelineStressThreadContext {
 	GpuStressGate* gate;
@@ -200,8 +158,6 @@ typedef struct GpuPipelineStressThreadContext {
 	size_t vertexIrSize;
 	const uint8_t* fragmentIr;
 	size_t fragmentIrSize;
-	const uint8_t* meshletIr;
-	size_t meshletIrSize;
 	GpuFunctionConstants constants;
 	size_t iterations;
 	uint32_t completed;
@@ -219,25 +175,19 @@ static void* gpuPipelineStressThreadProc(void* ptr) {
 		GpuResult pipelineResult = GPU_GENERAL_ERROR;
 		GpuPipeline pipeline = 0;
 
-		switch (i % 3u) {
+		switch (i % 2u) {
 			case 0u:
 				pipeline = gpuCreateComputePipeline(context->computeIr, context->computeIrSize, &context->constants, sizeof(context->constants), groupSize, &pipelineResult);
 				break;
 			case 1u:
+				GpuRasterDesc rasterDesc;
+				createDummyRasterDesc(&rasterDesc);
 				pipeline = gpuCreateRenderPipeline(
 					context->vertexIr, context->vertexIrSize,
 					context->fragmentIr, context->fragmentIrSize,
 					&context->constants, sizeof(context->constants),
 					&context->constants, sizeof(context->constants),
-					&pipelineResult
-				);
-				break;
-			default:
-				pipeline = gpuCreateMeshletPipeline(
-					context->meshletIr, context->meshletIrSize,
-					context->fragmentIr, context->fragmentIrSize,
-					&context->constants, sizeof(context->constants),
-					&context->constants, sizeof(context->constants),
+					&rasterDesc,
 					&pipelineResult
 				);
 				break;
@@ -275,10 +225,6 @@ static void runGpuPipelineStress(Test* test) {
 	size_t fragmentIrSize = 0;
 	TEST_ASSERT(test, loadBinaryFile("build/render_fragment_constants.metallib", &fragmentIr, &fragmentIrSize));
 
-	uint8_t* meshletIr = nullptr;
-	size_t meshletIrSize = 0;
-	TEST_ASSERT(test, loadBinaryFile("build/meshlet_constants.metallib", &meshletIr, &meshletIrSize));
-
 	const size_t threadCount = 6;
 	const size_t iterations = 96;
 
@@ -294,8 +240,6 @@ static void runGpuPipelineStress(Test* test) {
 		contexts[i].vertexIrSize = vertexIrSize;
 		contexts[i].fragmentIr = fragmentIr;
 		contexts[i].fragmentIrSize = fragmentIrSize;
-		contexts[i].meshletIr = meshletIr;
-		contexts[i].meshletIrSize = meshletIrSize;
 		contexts[i].constants.scale = 1.5f;
 		contexts[i].iterations = iterations;
 
@@ -316,7 +260,6 @@ static void runGpuPipelineStress(Test* test) {
 	freeBinaryFile(computeIr);
 	freeBinaryFile(vertexIr);
 	freeBinaryFile(fragmentIr);
-	freeBinaryFile(meshletIr);
 
 	gpuDeinit();
 }
