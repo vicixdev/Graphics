@@ -83,6 +83,16 @@ typedef struct GpuBaseLayer {
 
 	void (*gpuDispatch)(GpuCommandBuffer cb, void* dataGpu, uint32_t gridDimensions[3], GpuResult* result);
 	void (*gpuDispatchIndirect)(GpuCommandBuffer cb, void* dataGpu, void* gridDimensionsGpu, GpuResult* result);
+
+	void (*gpuBeginRenderPass)(GpuCommandBuffer cb, GpuRenderPassDesc desc, GpuResult* result);
+	void (*gpuEndRenderPass)(GpuCommandBuffer cb, GpuResult* result);
+
+	void (*gpuDrawIndexedInstanced)(GpuCommandBuffer cb, void* vertexDataGpu, void* pixelDataGpu, void* indicesGpu, uint32_t indexCount, uint32_t instanceCount, GpuResult* result);
+	void (*gpuDrawIndexedInstancedIndirect)(GpuCommandBuffer cb, void* vertexDataGpu, void* pixelDataGpu, void* indicesGpu, void* argsGpu, GpuResult* result);
+	void (*gpuDrawIndexedInstancedIndirectMulti)(GpuCommandBuffer cb, void* dataVxGpu, uint32_t vxStride, void* dataPxGpu, uint32_t pxStride, void* argsGpu, void* drawCountGpu, GpuResult* result);
+
+	void (*gpuDrawMeshlets)(GpuCommandBuffer cb, void* meshletDataGpu, void* pixelDataGpu, uint32_t dim[3], GpuResult* result);
+	void (*gpuDrawMeshletsIndirect)(GpuCommandBuffer cb, void* meshletDataGpu, void* pixelDataGpu, void *dimGpu, GpuResult* result);
 } GpuBaseLayer;
 
 typedef struct {

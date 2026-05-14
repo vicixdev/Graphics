@@ -248,3 +248,31 @@ void gpuDispatchIndirect(GpuCommandBuffer cb, void* dataGpu, void* gridDimension
 	GPU_LAYERED_CALL(gpuDispatchIndirect, cb, dataGpu, gridDimensionsGpu, result);
 }
 
+void gpuBeginRenderPass(GpuCommandBuffer cb, GpuRenderPassDesc desc, GpuResult* result) {
+	GPU_LAYERED_CALL(gpuBeginRenderPass, cb, desc, result);
+}
+
+void gpuEndRenderPass(GpuCommandBuffer cb, GpuResult* result) {
+	GPU_LAYERED_CALL(gpuEndRenderPass, cb, result);
+}
+
+void gpuDrawIndexedInstanced(GpuCommandBuffer cb, void* vertexDataGpu, void* pixelDataGpu, void* indicesGpu, uint32_t indexCount, uint32_t instanceCount, GpuResult* result) {
+	GPU_LAYERED_CALL(gpuDrawIndexedInstanced, cb, vertexDataGpu, pixelDataGpu, indicesGpu, indexCount, instanceCount, result);
+}
+
+void gpuDrawIndexedInstancedIndirect(GpuCommandBuffer cb, void* vertexDataGpu, void* pixelDataGpu, void* indicesGpu, void* argsGpu, GpuResult* result) {
+	GPU_LAYERED_CALL(gpuDrawIndexedInstancedIndirect, cb, vertexDataGpu, pixelDataGpu, indicesGpu, argsGpu, result);
+}
+
+void gpuDrawIndexedInstancedIndirectMulti(GpuCommandBuffer cb, void* dataVxGpu, uint32_t vxStride, void* dataPxGpu, uint32_t pxStride, void* argsGpu, void* drawCountGpu, GpuResult* result) {
+	GPU_LAYERED_CALL(gpuDrawIndexedInstancedIndirectMulti, cb, dataVxGpu, vxStride, dataPxGpu, pxStride, argsGpu, drawCountGpu, result);
+}
+
+void gpuDrawMeshlets(GpuCommandBuffer cb, void* meshletDataGpu, void* pixelDataGpu, uint32_t dim[3], GpuResult* result) {
+	GPU_LAYERED_CALL(gpuDrawMeshlets, cb, meshletDataGpu, pixelDataGpu, dim, result);
+}
+
+void gpuDrawMeshletsIndirect(GpuCommandBuffer cb, void* meshletDataGpu, void* pixelDataGpu, void *dimGpu, GpuResult* result) {
+	GPU_LAYERED_CALL(gpuDrawMeshletsIndirect, cb, meshletDataGpu, pixelDataGpu, dimGpu, result);
+}
+

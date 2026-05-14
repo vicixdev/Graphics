@@ -140,6 +140,12 @@ typedef enum GpuOp {
 	GPU_OP_ALWAYS,
 } GpuOp;
 
+typedef enum GpuTargetOp {
+	GPU_OP_CLEAR = 0,
+	GPU_OP_STORE,
+	GPU_OP_DONT_CARE,
+} GpuTargetOp;
+
 typedef enum GpuSignal {
 	GPU_SIGNAL_ATOMIC_SET = 0,
 	GPU_SIGNAL_ATOMIC_MAX,
@@ -293,6 +299,25 @@ typedef struct GpuRasterDesc {
 	GpuBlendDesc* blendstate /* = nullptr; */; // optional embedded blend state
 } GpuRasterDesc;
 
+typedef struct GpuRenderTarget {
+	GpuTexture texture;
+	GpuTargetOp loadOp;
+	GpuTargetOp storeOp;
+
+	union {
+		float depthClearValue;
+		uint32_t stencilClearValue;
+		float clearColor[4];
+	};
+} GpuRenderTarget;
+
+typedef struct GpuRenderPassDesc {
+	GpuRenderTarget* depthTarget;
+	GpuRenderTarget* stencilTarget;
+	GpuRenderTarget* colorTargets;
+	size_t colorTargetCount;
+} GpuRenderPassDesc;
+
 
 struct GpuInitDesc;
 
@@ -373,6 +398,16 @@ typedef struct GpuLayer {
 
 	bool (*gpuDispatch)(GpuCommandBuffer cb, void* dataGpu, uint32_t gridDimensions[3], GpuResult* result);
 	bool (*gpuDispatchIndirect)(GpuCommandBuffer cb, void* dataGpu, void* gridDimensionsGpu, GpuResult* result);
+
+	bool (*gpuBeginRenderPass)(GpuCommandBuffer cb, GpuRenderPassDesc desc, GpuResult* result);
+	bool (*gpuEndRenderPass)(GpuCommandBuffer cb, GpuResult* result);
+
+	bool (*gpuDrawIndexedInstanced)(GpuCommandBuffer cb, void* vertexDataGpu, void* pixelDataGpu, void* indicesGpu, uint32_t indexCount, uint32_t instanceCount, GpuResult* result);
+	bool (*gpuDrawIndexedInstancedIndirect)(GpuCommandBuffer cb, void* vertexDataGpu, void* pixelDataGpu, void* indicesGpu, void* argsGpu, GpuResult* result);
+	bool (*gpuDrawIndexedInstancedIndirectMulti)(GpuCommandBuffer cb, void* dataVxGpu, uint32_t vxStride, void* dataPxGpu, uint32_t pxStride, void* argsGpu, void* drawCountGpu, GpuResult* result);
+
+	bool (*gpuDrawMeshlets)(GpuCommandBuffer cb, void* meshletDataGpu, void* pixelDataGpu, uint32_t dim[3], GpuResult* result);
+	bool (*gpuDrawMeshletsIndirect)(GpuCommandBuffer cb, void* meshletDataGpu, void* pixelDataGpu, void *dimGpu, GpuResult* result);
 } GpuLayer;
 
 typedef struct GpuInitDesc {
@@ -460,15 +495,15 @@ void gpuSetBlendState(GpuCommandBuffer cb, GpuBlendState state, GpuResult* resul
 void gpuDispatch(GpuCommandBuffer cb, void* dataGpu, uint32_t gridDimensions[3], GpuResult* result);
 void gpuDispatchIndirect(GpuCommandBuffer cb, void* dataGpu, void* gridDimensionsGpu, GpuResult* result);
 
-// void gpuBeginRenderPass(GpuCommandBuffer cb, GpuRenderPassDesc desc);
-// void gpuEndRenderPass(GpuCommandBuffer cb);
+void gpuBeginRenderPass(GpuCommandBuffer cb, GpuRenderPassDesc desc, GpuResult* result);
+void gpuEndRenderPass(GpuCommandBuffer cb, GpuResult* result);
 
-// void gpuDrawIndexedInstanced(GpuCommandBuffer cb, void* vertexDataGpu, void* pixelDataGpu, void* indicesGpu, uint32_t indexCount, uint32_t instanceCount);
-// void gpuDrawIndexedInstancedIndirect(GpuCommandBuffer cb, void* vertexDataGpu, void* pixelDataGpu, void* indicesGpu, void* argsGpu);
-// void gpuDrawIndexedInstancedIndirectMulti(GpuCommandBuffer cb, void* dataVxGpu, uint32_t vxStride, void* dataPxGpu, uint32_t pxStride, void* argsGpu, void* drawCountGpu);
+void gpuDrawIndexedInstanced(GpuCommandBuffer cb, void* vertexDataGpu, void* pixelDataGpu, void* indicesGpu, uint32_t indexCount, uint32_t instanceCount, GpuResult* result);
+void gpuDrawIndexedInstancedIndirect(GpuCommandBuffer cb, void* vertexDataGpu, void* pixelDataGpu, void* indicesGpu, void* argsGpu, GpuResult* result);
+void gpuDrawIndexedInstancedIndirectMulti(GpuCommandBuffer cb, void* dataVxGpu, uint32_t vxStride, void* dataPxGpu, uint32_t pxStride, void* argsGpu, void* drawCountGpu, GpuResult* result);
 
-// void gpuDrawMeshlets(GpuCommandBuffer cb, void* meshletDataGpu, void* pixelDataGpu, uint32_t dim[3]);
-// void gpuDrawMeshletsIndirect(GpuCommandBuffer cb, void* meshletDataGpu, void* pixelDataGpu, void *dimGpu);
+void gpuDrawMeshlets(GpuCommandBuffer cb, void* meshletDataGpu, void* pixelDataGpu, uint32_t dim[3], GpuResult* result);
+void gpuDrawMeshletsIndirect(GpuCommandBuffer cb, void* meshletDataGpu, void* pixelDataGpu, void *dimGpu, GpuResult* result);
 
 #ifdef __cplusplus
 } // extern "C"
