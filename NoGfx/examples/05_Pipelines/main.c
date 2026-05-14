@@ -103,36 +103,68 @@ int main(void) {
 	uint32_t* rightBuffer = (uint32_t*)gpuMalloc(ADD_VECTOR_SIZE, 0, GPU_MEMORY_DEFAULT, NULL);
 	uint32_t* resultBuffer = (uint32_t*)gpuMalloc(ADD_VECTOR_SIZE, 0, GPU_MEMORY_READBACK, NULL);
 	Arguments* argumentBuffer = (Arguments*)gpuMalloc(sizeof(Arguments), 0, GPU_MEMORY_DEFAULT, NULL);
+	uint32_t* indirectBuffer = (uint32_t*)gpuMalloc(sizeof(uint32_t[3]), 0, GPU_MEMORY_DEFAULT, NULL);
 
 	void* deviceLeftBuffer = gpuHostToDevicePointer(leftBuffer, NULL);
 	void* deviceRightBuffer = gpuHostToDevicePointer(rightBuffer, NULL);
 	void* deviceResultBuffer = gpuHostToDevicePointer(resultBuffer, NULL);
 	void* deviceArgumentBuffer = gpuHostToDevicePointer(argumentBuffer, NULL);
-
-	for (size_t i = 0; i < ADD_VECTOR_LEN; i++) {
-		leftBuffer[i] = i;
-		rightBuffer[i] = ADD_VECTOR_LEN + i;
-	}
-
-	argumentBuffer->left = deviceLeftBuffer;
-	argumentBuffer->right = deviceRightBuffer;
-	argumentBuffer->result = deviceResultBuffer;
+	void* deviceIndirectBuffer = gpuHostToDevicePointer(indirectBuffer, NULL);
 
 	GpuQueue queue = gpuCreateQueue(NULL);
 	GpuSemaphore semaphore = gpuCreateSemaphore(0, NULL);
 
-	GpuCommandBuffer commandBuffer = gpuStartCommandEncoding(queue, NULL);
-	gpuSetPipeline(commandBuffer, pipeline, NULL);
-	gpuDispatch(commandBuffer, deviceArgumentBuffer, (uint32_t[3]){ ADD_VECTOR_LEN, 1, 1}, NULL);
+	{
+		for (size_t i = 0; i < ADD_VECTOR_LEN; i++) {
+			leftBuffer[i] = i;
+			rightBuffer[i] = ADD_VECTOR_LEN + i;
+		}
 
-	gpuSubmitWithSignal(queue, &commandBuffer, 1, semaphore, 1, NULL);
-	gpuWaitSemaphore(semaphore, 1, NULL);
+		argumentBuffer->left = deviceLeftBuffer;
+		argumentBuffer->right = deviceRightBuffer;
+		argumentBuffer->result = deviceResultBuffer;
 
-	printf("Result: [ ");
-	for (size_t i = 0; i < ADD_VECTOR_LEN; i++) {
-		printf("%d ", resultBuffer[i]);
+		GpuCommandBuffer commandBuffer = gpuStartCommandEncoding(queue, NULL);
+		gpuSetPipeline(commandBuffer, pipeline, NULL);
+		gpuDispatch(commandBuffer, deviceArgumentBuffer, (uint32_t[3]){ ADD_VECTOR_LEN, 1, 1}, NULL);
+
+		gpuSubmitWithSignal(queue, &commandBuffer, 1, semaphore, 1, NULL);
+		gpuWaitSemaphore(semaphore, 1, NULL);
+
+		printf("Direct Result: [ ");
+		for (size_t i = 0; i < ADD_VECTOR_LEN; i++) {
+			printf("%d ", resultBuffer[i]);
+		}
+		printf("]\n");
 	}
-	printf("]\n");
+
+	{
+		for (size_t i = 0; i < ADD_VECTOR_LEN; i++) {
+			leftBuffer[i] = ADD_VECTOR_LEN * 2 + i;
+			rightBuffer[i] = ADD_VECTOR_LEN + i;
+		}
+
+		argumentBuffer->left = deviceLeftBuffer;
+		argumentBuffer->right = deviceRightBuffer;
+		argumentBuffer->result = deviceResultBuffer;
+
+		indirectBuffer[0] = ADD_VECTOR_LEN;
+		indirectBuffer[1] = 1;
+		indirectBuffer[2] = 1;
+
+		GpuCommandBuffer commandBuffer = gpuStartCommandEncoding(queue, NULL);
+		gpuSetPipeline(commandBuffer, pipeline, NULL);
+		gpuDispatchIndirect(commandBuffer, deviceArgumentBuffer, deviceIndirectBuffer, NULL);
+
+		gpuSubmitWithSignal(queue, &commandBuffer, 1, semaphore, 2, NULL);
+		gpuWaitSemaphore(semaphore, 2, NULL);
+
+		printf("Indirect Result: [ ");
+		for (size_t i = 0; i < ADD_VECTOR_LEN; i++) {
+			printf("%d ", resultBuffer[i]);
+		}
+		printf("]\n");
+	}
 
 	gpuDeinit();
 	return 0;

@@ -228,3 +228,7 @@ void gpuDispatch(GpuCommandBuffer cb, void* dataGpu, uint32_t gridDimensions[3],
 	GPU_LAYERED_CALL(gpuDispatch, cb, dataGpu, gridDimensions, result);
 }
 
+void gpuDispatchIndirect(GpuCommandBuffer cb, void* dataGpu, void* gridDimensionsGpu, GpuResult* result) {
+	GPU_LAYERED_CALL(gpuDispatchIndirect, cb, dataGpu, gridDimensionsGpu, result);
+}
+

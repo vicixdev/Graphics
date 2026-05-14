@@ -9,7 +9,6 @@ Mtl4DepthStencilStateStorage gMtl4DepthStencilStateStorage;
 
 void mtl4InitDepthStencilStorage(GpuResult* result) {
 	CmnResult localResult;
-
 	gMtl4DepthStencilStateStorage.page = cmnCreatePage(1024 * 1024 * 32, CMN_PAGE_READABLE | CMN_PAGE_WRITABLE, &localResult);
 	if (localResult!= CMN_SUCCESS) {
 		CMN_SET_RESULT(result, GPU_OUT_OF_CPU_MEMORY);

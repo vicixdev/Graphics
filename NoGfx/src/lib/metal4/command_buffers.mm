@@ -427,7 +427,6 @@ void mtl4Dispatch(GpuCommandBuffer cb, void* dataGpu, uint32_t gridDimensions[3]
 	mtl4EnsureValidComputeEndoderFor(metadata);
 	[metadata->computeEncoder setComputePipelineState:pipelineMetadata->compute.pso];
 	[metadata->computeEncoder setArgumentTable:metadata->computeArgumentTable];
-	// TODO: Get groupSize from the pipeline... In some way...
 	[metadata->computeEncoder
 		dispatchThreadgroups:MTLSizeMake(gridDimensions[0], gridDimensions[1], gridDimensions[2])
 		threadsPerThreadgroup:MTLSizeMake(pipelineMetadata->compute.groupSize[0], pipelineMetadata->compute.groupSize[1], pipelineMetadata->compute.groupSize[2])];
@@ -435,6 +434,52 @@ void mtl4Dispatch(GpuCommandBuffer cb, void* dataGpu, uint32_t gridDimensions[3]
 	CMN_SET_RESULT(result, GPU_SUCCESS);
 	return;
 }
+
+void mtl4DispatchIndirect(GpuCommandBuffer cb, void* dataGpu, void* gridDimensionsGpu, GpuResult* result) {
+	Mtl4CommandBuffer handle = mtl4GpuCommandBufferToHandle(cb);
+	Mtl4CommandBufferMetadata* metadata = mtl4AcquireCommandBufferMetadataFrom(handle);
+	if (metadata == nullptr) {
+		CMN_SET_RESULT(result, GPU_NO_SUCH_COMMAND_BUFFER_FOUND);
+		return;
+	}
+
+	Mtl4PipelineMetadata* pipelineMetadata = mtl4AcquirePipelineMetadataFrom(metadata->pipeline);
+	if (pipelineMetadata == nullptr) {
+		CMN_SET_RESULT(result, GPU_NO_SUCH_PIPELINE_FOUND);
+		return;
+	}
+
+	if (pipelineMetadata->type != MTL4_PIPELINE_COMPUTE) {
+		CMN_SET_RESULT(result, GPU_INCOMPATIBLE_PIPELINE);
+		return;
+	}
+	defer (mtl4ReleasePipelineMetadata());
+
+	Mtl4AllocationMetadata* allocationMetadata = mtl4AcquireAllocationMetadataFromGpuPtr(dataGpu, true);
+	if (allocationMetadata == nullptr) {
+		CMN_SET_RESULT(result, GPU_NO_SUCH_ALLOCATION_FOUND);
+		return;
+	}
+	defer (mtl4ReleaseAllocationMetadata());
+
+	size_t gpuPointerOffset = mtl4GpuPtrOffsetFromBase(allocationMetadata, dataGpu);
+
+	MTLGPUAddress baseGpuAddress = [allocationMetadata->buffer gpuAddress] + gpuPointerOffset;
+	[metadata->computeArgumentTable setAddress:baseGpuAddress atIndex:0];
+
+	// TODO: In the validation, check that gridDimensionsGpu is 4-word aligned
+
+	mtl4EnsureValidComputeEndoderFor(metadata);
+	[metadata->computeEncoder setComputePipelineState:pipelineMetadata->compute.pso];
+	[metadata->computeEncoder setArgumentTable:metadata->computeArgumentTable];
+	[metadata->computeEncoder
+		dispatchThreadgroupsWithIndirectBuffer:(uintptr_t)gridDimensionsGpu
+		threadsPerThreadgroup:MTLSizeMake(pipelineMetadata->compute.groupSize[0], pipelineMetadata->compute.groupSize[1], pipelineMetadata->compute.groupSize[2])];
+
+	CMN_SET_RESULT(result, GPU_SUCCESS);
+	return;
+}
+
 
 bool mtl4AcquireResourcesForNewCommandBuffer(
 	Mtl4CommandBuffer* handle,

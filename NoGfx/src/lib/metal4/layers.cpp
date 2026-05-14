@@ -47,6 +47,7 @@ GpuBaseLayer gMtl4BaseLayer = {
 	/*gpuWaitBefore=*/		mtl4WaitBefore,
 	/*gpuSetPipeline=*/		mtl4SetPipeline,
 	/*gpuDispatch=*/		mtl4Dispatch,
+	/*gpuDispatchIndirect=*/	mtl4DispatchIndirect,
 };
 
 GpuLayer gMtl4ValidationLayer = {
@@ -84,5 +85,6 @@ GpuLayer gMtl4ValidationLayer = {
 	/*gpuWaitBefore=*/		mtl4ValidateGpuWaitBefore,
 	/*gpuSetPipeline=*/		nullptr,
 	/*gpuDispatch=*/		nullptr,
+	/*gpuDispatchIndirect=*/	nullptr,
 };
 

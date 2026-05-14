@@ -78,6 +78,7 @@ void mtl4SignalAfter(GpuCommandBuffer cb, GpuStageFlags before, void* ptrGpu, ui
 void mtl4WaitBefore(GpuCommandBuffer cb, GpuStageFlags after, void* ptrGpu, uint64_t value, GpuOp op, GpuHazardFlags hazards, uint64_t mask, GpuResult* result);
 
 void mtl4Dispatch(GpuCommandBuffer cb, void* dataGpu, uint32_t gridDimensions[3], GpuResult* result);
+void mtl4DispatchIndirect(GpuCommandBuffer cb, void* dataGpu, void* gridDimensionsGpu, GpuResult* result);
 
 bool mtl4AcquireResourcesForNewCommandBuffer(
 	Mtl4CommandBuffer* handle,
