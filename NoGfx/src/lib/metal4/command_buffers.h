@@ -5,6 +5,8 @@
 #include <lib/common/static_handle_map.h>
 #include <lib/metal4/pipelines.h>
 #include <lib/metal4/queue.h>
+#include <lib/metal4/depthstencilstates.h>
+#include <lib/metal4/blend_states.h>
 
 #include <gpu/gpu.h>
 #include <Metal/Metal.h>
@@ -36,6 +38,9 @@ typedef struct Mtl4CommandBufferMetadata {
 	id<MTL4ArgumentTable>		computeArgumentTable;
 
 	Mtl4Pipeline			pipeline;
+	Mtl4DepthStencilState		depthStencil;
+	Mtl4BlendState			blend;
+	void*				textureHeapPtr;
 } Mtl4CommandBufferMetadata;
 
 typedef struct Mtl4CommandBufferStorage {
@@ -72,6 +77,8 @@ void mtl4CopyFromTexture(GpuCommandBuffer cb, void* destGpu, void* srcGpu, GpuTe
 
 void mtl4SetPipeline(GpuCommandBuffer cb, GpuPipeline pipeline, GpuResult* result);
 void mtl4SetActiveTextureHeapPtr(GpuCommandBuffer cb, void *ptrGpu, GpuResult* result);
+void mtl4SetDepthStencilState(GpuCommandBuffer cb, GpuDepthStencilState state, GpuResult* result);
+void mtl4SetBlendState(GpuCommandBuffer cb, GpuBlendState state, GpuResult* result);
 
 void mtl4Barrier(GpuCommandBuffer cb, GpuStageFlags before, GpuStageFlags after, GpuHazardFlags hazards, GpuResult* result);
 void mtl4SignalAfter(GpuCommandBuffer cb, GpuStageFlags before, void* ptrGpu, uint64_t value, GpuSignal signal, GpuResult* result);

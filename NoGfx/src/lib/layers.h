@@ -51,7 +51,6 @@ typedef struct GpuBaseLayer {
 	void (*gpuFreeDepthStencilState)(GpuDepthStencilState state);
 	void (*gpuFreeBlendState)(GpuBlendState state);
 
-
 	GpuQueue (*gpuCreateQueue)(GpuResult* result);
 	GpuCommandBuffer (*gpuStartCommandEncoding)(GpuQueue queue, GpuResult* result);
 	void (*gpuSubmit)(GpuQueue queue, GpuCommandBuffer* commandBuffers, size_t commandBufferCount, GpuResult* result);
@@ -72,11 +71,16 @@ typedef struct GpuBaseLayer {
 	void (*gpuCopyToTexture)(GpuCommandBuffer cb, void* destGpu, void* srcGpu, GpuTexture texture, GpuResult* result);
 	void (*gpuCopyFromTexture)(GpuCommandBuffer cb, void* destGpu, void* srcGpu, GpuTexture texture, GpuResult* result);
 
+	void (*gpuSetActiveTextureHeapPtr)(GpuCommandBuffer cb, void* ptrGpu, GpuResult* result);
+
 	void (*gpuBarrier)(GpuCommandBuffer cb, GpuStageFlags before, GpuStageFlags after, GpuHazardFlags hazards, GpuResult* result);
 	void (*gpuSignalAfter)(GpuCommandBuffer cb, GpuStageFlags before, void* ptrGpu, uint64_t value, GpuSignal signal, GpuResult* result);
 	void (*gpuWaitBefore)(GpuCommandBuffer cb, GpuStageFlags after, void* ptrGpu, uint64_t value, GpuOp op, GpuHazardFlags hazards, uint64_t mask, GpuResult* result);
 
 	void (*gpuSetPipeline)(GpuCommandBuffer cb, GpuPipeline pipeline, GpuResult* result);
+	void (*gpuSetDepthStencilState)(GpuCommandBuffer cb, GpuDepthStencilState state, GpuResult* result);
+	void (*gpuSetBlendState)(GpuCommandBuffer cb, GpuBlendState state, GpuResult* result); 
+
 	void (*gpuDispatch)(GpuCommandBuffer cb, void* dataGpu, uint32_t gridDimensions[3], GpuResult* result);
 	void (*gpuDispatchIndirect)(GpuCommandBuffer cb, void* dataGpu, void* gridDimensionsGpu, GpuResult* result);
 } GpuBaseLayer;

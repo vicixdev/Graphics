@@ -10,6 +10,6 @@ struct VertexOut {
 
 [[host_name("main")]] vertex VertexOut vertexMain(uint vertexId [[vertex_id]]) {
 	VertexOut out;
-	out.position = float4(float(vertexId) * float(vertexScale), 0.0, 0.0, 1.0);
+	out.position = float4(float(vertexId) * as_type<float>(vertexScale), 0.0, 0.0, 1.0);
 	return out;
 }

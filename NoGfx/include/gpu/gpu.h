@@ -361,11 +361,16 @@ typedef struct GpuLayer {
 	bool (*gpuCopyToTexture)(GpuCommandBuffer cb, void* destGpu, void* srcGpu, GpuTexture texture, GpuResult* result);
 	bool (*gpuCopyFromTexture)(GpuCommandBuffer cb, void* destGpu, void* srcGpu, GpuTexture texture, GpuResult* result);
 
+	bool (*gpuSetActiveTextureHeapPtr)(GpuCommandBuffer cb, void* ptrGpu, GpuResult* result);
+
 	bool (*gpuBarrier)(GpuCommandBuffer cb, GpuStageFlags before, GpuStageFlags after, GpuHazardFlags hazards, GpuResult* result);
 	bool (*gpuSignalAfter)(GpuCommandBuffer cb, GpuStageFlags before, void* ptrGpu, uint64_t value, GpuSignal signal, GpuResult* result);
 	bool (*gpuWaitBefore)(GpuCommandBuffer cb, GpuStageFlags after, void* ptrGpu, uint64_t value, GpuOp op, GpuHazardFlags hazards, uint64_t mask, GpuResult* result);
 
 	bool (*gpuSetPipeline)(GpuCommandBuffer cb, GpuPipeline pipeline, GpuResult* result);
+	bool (*gpuSetDepthStencilState)(GpuCommandBuffer cb, GpuDepthStencilState state, GpuResult* result);
+	bool (*gpuSetBlendState)(GpuCommandBuffer cb, GpuBlendState state, GpuResult* result); 
+
 	bool (*gpuDispatch)(GpuCommandBuffer cb, void* dataGpu, uint32_t gridDimensions[3], GpuResult* result);
 	bool (*gpuDispatchIndirect)(GpuCommandBuffer cb, void* dataGpu, void* gridDimensionsGpu, GpuResult* result);
 } GpuLayer;
@@ -450,7 +455,7 @@ void gpuWaitBefore(GpuCommandBuffer cb, GpuStageFlags after, void* ptrGpu, uint6
 
 void gpuSetPipeline(GpuCommandBuffer cb, GpuPipeline pipeline, GpuResult* result);
 void gpuSetDepthStencilState(GpuCommandBuffer cb, GpuDepthStencilState state, GpuResult* result);
-void gpuSetBlendState(GpuCommandBuffer cb, GpuBlendState state, GpuResult* result); 
+void gpuSetBlendState(GpuCommandBuffer cb, GpuBlendState state, GpuResult* result);
 
 void gpuDispatch(GpuCommandBuffer cb, void* dataGpu, uint32_t gridDimensions[3], GpuResult* result);
 void gpuDispatchIndirect(GpuCommandBuffer cb, void* dataGpu, void* gridDimensionsGpu, GpuResult* result);

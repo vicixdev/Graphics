@@ -216,6 +216,10 @@ void gpuBarrier(GpuCommandBuffer cb, GpuStageFlags before, GpuStageFlags after, 
 	GPU_LAYERED_CALL(gpuBarrier, cb, before, after, hazards, result);
 }
 
+void gpuSetActiveTextureHeapPtr(GpuCommandBuffer cb, void* ptrGpu, GpuResult* result) {
+	GPU_LAYERED_CALL(gpuSetActiveTextureHeapPtr, cb, ptrGpu, result);
+}
+
 void gpuSignalAfter(GpuCommandBuffer cb, GpuStageFlags before, void* ptrGpu, uint64_t value, GpuSignal signal, GpuResult* result) {
 	GPU_LAYERED_CALL(gpuSignalAfter, cb, before, ptrGpu, value, signal, result);
 }
@@ -226,6 +230,14 @@ void gpuWaitBefore(GpuCommandBuffer cb, GpuStageFlags after, void* ptrGpu, uint6
 
 void gpuSetPipeline(GpuCommandBuffer cb, GpuPipeline pipeline, GpuResult* result) {
 	GPU_LAYERED_CALL(gpuSetPipeline, cb, pipeline, result);
+}
+
+void gpuSetDepthStencilState(GpuCommandBuffer cb, GpuDepthStencilState state, GpuResult* result) {
+	GPU_LAYERED_CALL(gpuSetDepthStencilState, cb, state, result);
+}
+
+void gpuSetBlendState(GpuCommandBuffer cb, GpuBlendState state, GpuResult* result) {
+	GPU_LAYERED_CALL(gpuSetBlendState, cb, state, result);
 }
 
 void gpuDispatch(GpuCommandBuffer cb, void* dataGpu, uint32_t gridDimensions[3], GpuResult* result) {
