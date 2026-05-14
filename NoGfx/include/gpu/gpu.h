@@ -27,6 +27,8 @@ typedef enum GpuResult {
 	GPU_NO_SUCH_COMMAND_BUFFER_FOUND,
 	GPU_NO_SUCH_PIPELINE_FOUND,
 	GPU_NO_SUCH_SEMAPHORE_FOUND,
+	GPU_NO_SUCH_DEPTH_STENCIL_STATE_FOUND,
+	GPU_NO_SUCH_BLEND_STATE_FOUND,
 	GPU_ALLOCATION_MEMORY_IS_GPU,
 	GPU_ALLOCATION_MEMORY_IS_CPU,
 
@@ -142,6 +144,7 @@ typedef enum GpuOp {
 
 typedef enum GpuTargetOp {
 	GPU_OP_CLEAR = 0,
+	GPU_OP_LOAD,
 	GPU_OP_STORE,
 	GPU_OP_DONT_CARE,
 } GpuTargetOp;
@@ -399,7 +402,7 @@ typedef struct GpuLayer {
 	bool (*gpuDispatch)(GpuCommandBuffer cb, void* dataGpu, uint32_t gridDimensions[3], GpuResult* result);
 	bool (*gpuDispatchIndirect)(GpuCommandBuffer cb, void* dataGpu, void* gridDimensionsGpu, GpuResult* result);
 
-	bool (*gpuBeginRenderPass)(GpuCommandBuffer cb, GpuRenderPassDesc desc, GpuResult* result);
+	bool (*gpuBeginRenderPass)(GpuCommandBuffer cb, const GpuRenderPassDesc* desc, GpuResult* result);
 	bool (*gpuEndRenderPass)(GpuCommandBuffer cb, GpuResult* result);
 
 	bool (*gpuDrawIndexedInstanced)(GpuCommandBuffer cb, void* vertexDataGpu, void* pixelDataGpu, void* indicesGpu, uint32_t indexCount, uint32_t instanceCount, GpuResult* result);
@@ -495,7 +498,7 @@ void gpuSetBlendState(GpuCommandBuffer cb, GpuBlendState state, GpuResult* resul
 void gpuDispatch(GpuCommandBuffer cb, void* dataGpu, uint32_t gridDimensions[3], GpuResult* result);
 void gpuDispatchIndirect(GpuCommandBuffer cb, void* dataGpu, void* gridDimensionsGpu, GpuResult* result);
 
-void gpuBeginRenderPass(GpuCommandBuffer cb, GpuRenderPassDesc desc, GpuResult* result);
+void gpuBeginRenderPass(GpuCommandBuffer cb, const GpuRenderPassDesc* desc, GpuResult* result);
 void gpuEndRenderPass(GpuCommandBuffer cb, GpuResult* result);
 
 void gpuDrawIndexedInstanced(GpuCommandBuffer cb, void* vertexDataGpu, void* pixelDataGpu, void* indicesGpu, uint32_t indexCount, uint32_t instanceCount, GpuResult* result);

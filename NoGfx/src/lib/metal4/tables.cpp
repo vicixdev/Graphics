@@ -104,3 +104,24 @@ const MTLStencilOperation gMtl4GpuOpToMtlStencilOperation[] = {
 	/*GPU_OP_GREATER_EQUAL=*/	MTLStencilOperationIncrementWrap,
 	/*GPU_OP_ALWAYS=*/		MTLStencilOperationDecrementWrap,
 };
+
+const MTLLoadAction gMtl4GpuTargetOpToMtlLoadAction[] {
+	/*GPU_OP_CLEAR=*/		MTLLoadActionClear,
+	/*GPU_OP_LOAD=*/		MTLLoadActionLoad,
+	/*GPU_OP_STORE=*/		(MTLLoadAction)-1,
+	/*GPU_OP_DONT_CARE=*/		MTLLoadActionDontCare,
+};
+
+const MTLStoreAction gMtl4GpuTargetOpToMtlStoreAction[] {
+	/*GPU_OP_CLEAR=*/		(MTLStoreAction)-1,
+	/*GPU_OP_LOAD=*/		(MTLStoreAction)-1,
+	/*GPU_OP_STORE=*/		MTLStoreActionStore,
+	/*GPU_OP_DONT_CARE=*/		MTLStoreActionDontCare,
+};
+
+const MTLPrimitiveType gMtl4GpuTopologyToMtlPrimitive[] {
+	/*GPU_TOPOLOGY_TRIANGLE_LIST=*/	MTLPrimitiveTypeTriangle,
+	/*GPU_TOPOLOGY_TRIANGLE_STRIP=*/MTLPrimitiveTypeTriangleStrip,
+	/*GPU_TOPOLOGY_TRIANGLE_FAN=*/ 	(MTLPrimitiveType)-1,
+};
+

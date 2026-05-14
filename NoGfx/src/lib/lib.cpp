@@ -248,7 +248,7 @@ void gpuDispatchIndirect(GpuCommandBuffer cb, void* dataGpu, void* gridDimension
 	GPU_LAYERED_CALL(gpuDispatchIndirect, cb, dataGpu, gridDimensionsGpu, result);
 }
 
-void gpuBeginRenderPass(GpuCommandBuffer cb, GpuRenderPassDesc desc, GpuResult* result) {
+void gpuBeginRenderPass(GpuCommandBuffer cb, const GpuRenderPassDesc* desc, GpuResult* result) {
 	GPU_LAYERED_CALL(gpuBeginRenderPass, cb, desc, result);
 }
 

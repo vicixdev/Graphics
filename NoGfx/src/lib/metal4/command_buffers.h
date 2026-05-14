@@ -36,6 +36,8 @@ typedef struct Mtl4CommandBufferMetadata {
 	id<MTL4RenderCommandEncoder>	renderEncoder;
 
 	id<MTL4ArgumentTable>		computeArgumentTable;
+	id<MTL4ArgumentTable>		vertexArgumentTable;
+	id<MTL4ArgumentTable>		fragmentArgumentTable;
 
 	Mtl4Pipeline			pipeline;
 	Mtl4DepthStencilState		depthStencil;
@@ -48,6 +50,8 @@ typedef struct Mtl4CommandBufferStorage {
 	id<MTL4CommandAllocator>	commandAllocators	[MTL4_MAX_PARALLEL_COMMANDBUFFER_ENCODINGS];
 	id<MTL4CommandQueue>		queues			[MTL4_MAX_PARALLEL_COMMANDBUFFER_ENCODINGS];
 	id<MTL4ArgumentTable>		computeArgumentTables	[MTL4_MAX_PARALLEL_COMMANDBUFFER_ENCODINGS];
+	id<MTL4ArgumentTable>		vertexArgumentTables	[MTL4_MAX_PARALLEL_COMMANDBUFFER_ENCODINGS];
+	id<MTL4ArgumentTable>		fragmentArgumentTables	[MTL4_MAX_PARALLEL_COMMANDBUFFER_ENCODINGS];
 
 	// Atomic
 	uint64_t submitCount;
@@ -87,11 +91,18 @@ void mtl4WaitBefore(GpuCommandBuffer cb, GpuStageFlags after, void* ptrGpu, uint
 void mtl4Dispatch(GpuCommandBuffer cb, void* dataGpu, uint32_t gridDimensions[3], GpuResult* result);
 void mtl4DispatchIndirect(GpuCommandBuffer cb, void* dataGpu, void* gridDimensionsGpu, GpuResult* result);
 
+void mtl4BeginRenderPass(GpuCommandBuffer cb, const GpuRenderPassDesc* desc, GpuResult* result);
+void mtl4EndRenderPass(GpuCommandBuffer cb, GpuResult* result);
+
+void mtl4DrawIndexedInstanced(GpuCommandBuffer cb, void* vertexDataGpu, void* pixelDataGpu, void* indicesGpu, uint32_t indexCount, uint32_t instanceCount, GpuResult* result);
+
 bool mtl4AcquireResourcesForNewCommandBuffer(
 	Mtl4CommandBuffer* handle,
 	id<MTL4CommandQueue>* queue,
 	id<MTL4CommandAllocator>* mtlAllocator,
 	id<MTL4ArgumentTable>* computeArgumentTable,
+	id<MTL4ArgumentTable>* vertexArgumentTable,
+	id<MTL4ArgumentTable>* fragmentArgumentTable,
 	id<MTLSharedEvent>* submitEvent
 );
 // NOTE: Requires deletion-lock on gMtl4CommandBufferStorage.sync.

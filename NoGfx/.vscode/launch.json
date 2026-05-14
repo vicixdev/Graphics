@@ -69,6 +69,32 @@
                 // "MTL_CAPTURE_ENABLED": "1"
             },
             "cwd": "${workspaceFolder}/examples/05_Pipelines"
+        },
+        {
+            "type": "lldb",
+            "request": "launch",
+            "name": "06_ClearColor",
+            "program": "${workspaceFolder}/examples/06_ClearColor/out",
+            "args": [],
+            "env": {
+                "MTL_DEBUG_LAYER": "1",
+                // "MTL_DEBUG_LAYER_WARNING_MODE": "nslog",
+                // "MTL_CAPTURE_ENABLED": "1"
+            },
+            "cwd": "${workspaceFolder}/examples/06_ClearColor"
+        },
+        {
+            "type": "lldb",
+            "request": "launch",
+            "name": "07_Triangle",
+            "program": "${workspaceFolder}/examples/07_Triangle/out",
+            "args": [],
+            "env": {
+                "MTL_DEBUG_LAYER": "1",
+                // "MTL_DEBUG_LAYER_WARNING_MODE": "nslog",
+                // "MTL_CAPTURE_ENABLED": "1"
+            },
+            "cwd": "${workspaceFolder}/examples/07_Triangle"
         }
     ]
 }

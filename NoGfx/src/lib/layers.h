@@ -84,7 +84,7 @@ typedef struct GpuBaseLayer {
 	void (*gpuDispatch)(GpuCommandBuffer cb, void* dataGpu, uint32_t gridDimensions[3], GpuResult* result);
 	void (*gpuDispatchIndirect)(GpuCommandBuffer cb, void* dataGpu, void* gridDimensionsGpu, GpuResult* result);
 
-	void (*gpuBeginRenderPass)(GpuCommandBuffer cb, GpuRenderPassDesc desc, GpuResult* result);
+	void (*gpuBeginRenderPass)(GpuCommandBuffer cb, const GpuRenderPassDesc* desc, GpuResult* result);
 	void (*gpuEndRenderPass)(GpuCommandBuffer cb, GpuResult* result);
 
 	void (*gpuDrawIndexedInstanced)(GpuCommandBuffer cb, void* vertexDataGpu, void* pixelDataGpu, void* indicesGpu, uint32_t indexCount, uint32_t instanceCount, GpuResult* result);

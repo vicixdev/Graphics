@@ -49,11 +49,20 @@ void mtl4InitCommandBufferStorage(GpuResult* result) {
 		gMtl4CommandBufferStorage.submitEvents[i] = event;
 	}
 
-	MTL4ArgumentTableDescriptor* computeArgumentTableDesc = [MTL4ArgumentTableDescriptor new];
-	defer ([computeArgumentTableDesc release]);
+	MTL4ArgumentTableDescriptor* computeArgumentTableDesc = [[MTL4ArgumentTableDescriptor new] autorelease];
 	computeArgumentTableDesc.maxBufferBindCount = 1;
 	computeArgumentTableDesc.maxSamplerStateBindCount = 0;
 	computeArgumentTableDesc.maxTextureBindCount = 0;
+
+	MTL4ArgumentTableDescriptor* vertexArgumentTableDesc = [[MTL4ArgumentTableDescriptor new] autorelease];
+	vertexArgumentTableDesc.maxBufferBindCount = 1;
+	vertexArgumentTableDesc.maxSamplerStateBindCount = 0;
+	vertexArgumentTableDesc.maxTextureBindCount = 0;
+
+	MTL4ArgumentTableDescriptor* fragmentArgumentTableDesc = [[MTL4ArgumentTableDescriptor new] autorelease];
+	fragmentArgumentTableDesc.maxBufferBindCount = 2;
+	fragmentArgumentTableDesc.maxSamplerStateBindCount = 0;
+	fragmentArgumentTableDesc.maxTextureBindCount = 0;
 
 	for (size_t i = 0; i < MTL4_MAX_PARALLEL_COMMANDBUFFER_ENCODINGS; i++) {
 		id<MTL4ArgumentTable> argumentTable = [gMtl4Context.device
@@ -65,6 +74,31 @@ void mtl4InitCommandBufferStorage(GpuResult* result) {
 		}
 
 		gMtl4CommandBufferStorage.computeArgumentTables[i] = argumentTable;
+	}
+
+	for (size_t i = 0; i < MTL4_MAX_PARALLEL_COMMANDBUFFER_ENCODINGS; i++) {
+		id<MTL4ArgumentTable> argumentTable = [gMtl4Context.device
+			newArgumentTableWithDescriptor:vertexArgumentTableDesc
+			error:nullptr];
+		if (argumentTable == nil) {
+			CMN_SET_RESULT(result, GPU_OUT_OF_CPU_MEMORY);
+			return;
+		}
+
+		gMtl4CommandBufferStorage.vertexArgumentTables[i] = argumentTable;
+	}
+
+
+	for (size_t i = 0; i < MTL4_MAX_PARALLEL_COMMANDBUFFER_ENCODINGS; i++) {
+		id<MTL4ArgumentTable> argumentTable = [gMtl4Context.device
+			newArgumentTableWithDescriptor:fragmentArgumentTableDesc
+			error:nullptr];
+		if (argumentTable == nil) {
+			CMN_SET_RESULT(result, GPU_OUT_OF_CPU_MEMORY);
+			return;
+		}
+
+		gMtl4CommandBufferStorage.fragmentArgumentTables[i] = argumentTable;
 	}
 
 	CMN_SET_RESULT(result, GPU_SUCCESS);
@@ -102,8 +136,18 @@ GpuCommandBuffer mtl4StartCommandEncoding(GpuQueue queue, GpuResult* result) {
 	id<MTL4CommandAllocator> mtlAllocator;
 	id<MTLSharedEvent> submitEvent;
 	id<MTL4ArgumentTable> computeArgumentTable;
+	id<MTL4ArgumentTable> vertexArgumentTable;
+	id<MTL4ArgumentTable> fragmentArgumentTable;
 
-	if (!mtl4AcquireResourcesForNewCommandBuffer(&handle, &mtlQueue, &mtlAllocator, &computeArgumentTable, &submitEvent)) {
+	if (!mtl4AcquireResourcesForNewCommandBuffer(
+		&handle,
+		&mtlQueue,
+		&mtlAllocator,
+		&computeArgumentTable,
+		&vertexArgumentTable,
+		&fragmentArgumentTable,
+		&submitEvent
+	)) {
 		CMN_SET_RESULT(result, GPU_TOO_MANY_UNSUBMITTED_COMMAND_BUFFERS);
 		return {};
 	}
@@ -116,6 +160,8 @@ GpuCommandBuffer mtl4StartCommandEncoding(GpuQueue queue, GpuResult* result) {
 	metadata->submitEvent = submitEvent;
 	metadata->commandAllocator = mtlAllocator;
 	metadata->computeArgumentTable = computeArgumentTable;
+	metadata->vertexArgumentTable = vertexArgumentTable;
+	metadata->fragmentArgumentTable = fragmentArgumentTable;
 
 	uint64_t submitCount = cmnAtomicLoad(&gMtl4CommandBufferStorage.submitCount);
 	[metadata->queue waitForEvent:submitEvent value:submitCount];
@@ -511,12 +557,132 @@ void mtl4DispatchIndirect(GpuCommandBuffer cb, void* dataGpu, void* gridDimensio
 	return;
 }
 
+void mtl4BeginRenderPass(GpuCommandBuffer cb, const GpuRenderPassDesc* desc, GpuResult* result) {
+	Mtl4CommandBuffer handle = mtl4GpuCommandBufferToHandle(cb);
+	Mtl4CommandBufferMetadata* metadata = mtl4AcquireCommandBufferMetadataFrom(handle);
+	if (metadata == nullptr) {
+		CMN_SET_RESULT(result, GPU_NO_SUCH_COMMAND_BUFFER_FOUND);
+		return;
+	}
+
+	MTL4RenderPassDescriptor* renderPassDesc = [[MTL4RenderPassDescriptor new] autorelease];
+
+	for (size_t i = 0; i < desc->colorTargetCount; i++) {
+		const GpuRenderTarget* target = &desc->colorTargets[i];
+
+		Mtl4Texture targetTextureHandle = mtl4GpuTextureToHadle(target->texture);
+		Mtl4TextureMetadata* targetTexture = mtl4AcquireTextureMetadataFrom(targetTextureHandle);
+		if (targetTexture == nullptr) {
+			CMN_SET_RESULT(result, GPU_NO_SUCH_TEXTURE_FOUND);
+			return;
+		}
+		defer (mtl4ReleaseTextureMetadata());
+
+		MTLRenderPassColorAttachmentDescriptor* colorAttachment = [[MTLRenderPassColorAttachmentDescriptor new] autorelease];
+		colorAttachment.texture = targetTexture->texture;
+		colorAttachment.loadAction = gMtl4GpuTargetOpToMtlLoadAction[target->loadOp];
+		colorAttachment.storeAction = gMtl4GpuTargetOpToMtlStoreAction[target->storeOp];
+		colorAttachment.clearColor = MTLClearColorMake(
+			target->clearColor[0],
+			target->clearColor[1],
+			target->clearColor[2],
+			target->clearColor[3]
+		);
+
+		renderPassDesc.colorAttachments[i] = colorAttachment;
+
+	}
+
+	if (desc->depthTarget != nullptr) {
+		Mtl4Texture depthTargetHandle = mtl4GpuTextureToHadle(desc->depthTarget->texture);
+		Mtl4TextureMetadata* depthTarget = mtl4AcquireTextureMetadataFrom(depthTargetHandle);
+		if (depthTarget == nullptr) {
+			CMN_SET_RESULT(result, GPU_NO_SUCH_TEXTURE_FOUND);
+			return;
+		}
+		defer (mtl4ReleaseTextureMetadata());
+
+		MTLRenderPassDepthAttachmentDescriptor* depthAttachment = [[MTLRenderPassDepthAttachmentDescriptor new] autorelease];
+		depthAttachment.texture = depthTarget->texture;
+		depthAttachment.clearDepth = desc->depthTarget->depthClearValue;
+		depthAttachment.loadAction = gMtl4GpuTargetOpToMtlLoadAction[desc->depthTarget->loadOp];
+		depthAttachment.storeAction = gMtl4GpuTargetOpToMtlStoreAction[desc->depthTarget->storeOp];
+
+		renderPassDesc.depthAttachment = depthAttachment;
+	}
+
+	if (desc->stencilTarget != nullptr) {
+		Mtl4Texture stencilTargetHandle = mtl4GpuTextureToHadle(desc->stencilTarget->texture);
+		Mtl4TextureMetadata* stencilTarget = mtl4AcquireTextureMetadataFrom(stencilTargetHandle);
+		if (stencilTarget == nullptr) {
+			CMN_SET_RESULT(result, GPU_NO_SUCH_TEXTURE_FOUND);
+			return;
+		}
+		defer (mtl4ReleaseTextureMetadata());
+
+		MTLRenderPassStencilAttachmentDescriptor* stencilAttachment = [[MTLRenderPassStencilAttachmentDescriptor new] autorelease];
+		stencilAttachment.texture = stencilTarget->texture;
+		stencilAttachment.clearStencil = desc->stencilTarget->stencilClearValue;
+		stencilAttachment.loadAction = gMtl4GpuTargetOpToMtlLoadAction[desc->stencilTarget->loadOp];
+		stencilAttachment.storeAction = gMtl4GpuTargetOpToMtlStoreAction[desc->stencilTarget->storeOp];
+
+		renderPassDesc.stencilAttachment = stencilAttachment;
+	}
+
+	mtl4EnsureValidCommandBuffer(metadata);
+	metadata->renderEncoder = [metadata->commandBuffer renderCommandEncoderWithDescriptor:renderPassDesc];
+}
+
+void mtl4EndRenderPass(GpuCommandBuffer cb, GpuResult* result) {
+	Mtl4CommandBuffer handle = mtl4GpuCommandBufferToHandle(cb);
+	Mtl4CommandBufferMetadata* metadata = mtl4AcquireCommandBufferMetadataFrom(handle);
+	if (metadata == nullptr) {
+		CMN_SET_RESULT(result, GPU_NO_SUCH_COMMAND_BUFFER_FOUND);
+		return;
+	}
+
+	[metadata->renderEncoder endEncoding];
+}
+
+void mtl4DrawIndexedInstanced(GpuCommandBuffer cb, void* vertexDataGpu, void* pixelDataGpu, void* indicesGpu, uint32_t indexCount, uint32_t instanceCount, GpuResult* result) {
+	Mtl4CommandBuffer handle = mtl4GpuCommandBufferToHandle(cb);
+	Mtl4CommandBufferMetadata* metadata = mtl4AcquireCommandBufferMetadataFrom(handle);
+	if (metadata == nullptr) {
+		CMN_SET_RESULT(result, GPU_NO_SUCH_COMMAND_BUFFER_FOUND);
+		return;
+	}
+
+	Mtl4PipelineMetadata* pipeline = mtl4AcquirePipelineMetadataFrom(metadata->pipeline);
+	if (pipeline == nullptr) {
+		CMN_SET_RESULT(result, GPU_NO_SUCH_PIPELINE_FOUND);
+		return;
+	}
+	defer (mtl4ReleasePipelineMetadata());
+
+	[metadata->vertexArgumentTable setAddress:(uintptr_t)vertexDataGpu atIndex:0];
+
+	[metadata->fragmentArgumentTable setAddress:(uintptr_t)pixelDataGpu atIndex:0];
+	[metadata->fragmentArgumentTable setAddress:(uintptr_t)metadata->textureHeapPtr atIndex:1];
+
+	[metadata->renderEncoder setArgumentTable:metadata->vertexArgumentTable atStages:MTLStageVertex];
+	[metadata->renderEncoder setArgumentTable:metadata->fragmentArgumentTable atStages:MTLStageFragment];
+	[metadata->renderEncoder setRenderPipelineState:pipeline->graphics.pso];
+	[metadata->renderEncoder
+		drawIndexedPrimitives:gMtl4GpuTopologyToMtlPrimitive[pipeline->graphics.desc.topology]
+		indexCount:indexCount
+		indexType:MTLIndexTypeUInt32
+		indexBuffer:(uintptr_t)indicesGpu
+		indexBufferLength:sizeof(uint32_t) * indexCount
+		instanceCount:instanceCount];
+}
 
 bool mtl4AcquireResourcesForNewCommandBuffer(
 	Mtl4CommandBuffer* handle,
 	id<MTL4CommandQueue>* queue,
 	id<MTL4CommandAllocator>* mtlAllocator,
 	id<MTL4ArgumentTable>* computeArgumentTable,
+	id<MTL4ArgumentTable>* vertexArgumentTable,
+	id<MTL4ArgumentTable>* fragmentArgumentTable,
 	id<MTLSharedEvent>* submitEvent
 ) {
 	
@@ -535,6 +701,8 @@ bool mtl4AcquireResourcesForNewCommandBuffer(
 	*queue		= gMtl4CommandBufferStorage.queues[handle->index];
 	*mtlAllocator	= gMtl4CommandBufferStorage.commandAllocators[handle->index];
 	*computeArgumentTable = gMtl4CommandBufferStorage.computeArgumentTables[handle->index];
+	*vertexArgumentTable = gMtl4CommandBufferStorage.vertexArgumentTables[handle->index];
+	*fragmentArgumentTable = gMtl4CommandBufferStorage.fragmentArgumentTables[handle->index];
 	*submitEvent	= gMtl4CommandBufferStorage.submitEvents[handle->index];
 
 	return true;

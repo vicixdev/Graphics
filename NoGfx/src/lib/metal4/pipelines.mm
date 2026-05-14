@@ -1,5 +1,6 @@
 #include "pipelines.h"
 
+#include <Foundation/Foundation.h>
 #include <dispatch/dispatch.h>
 
 #include <lib/common/heap_allocator.h>
@@ -371,6 +372,21 @@ Mtl4Pipeline mtl4CreateGraphicsPipeline(Mtl4Function vertex, Mtl4Function fragme
 	pipelineDesc.inputPrimitiveTopology = MTLPrimitiveTopologyClassTriangle;
 	pipelineDesc.supportIndirectCommandBuffers = MTL4IndirectCommandBufferSupportStateEnabled;
 
+	// MTLVertexDescriptor* vertexDesc = [[MTLVertexDescriptor new] autorelease];
+
+	// MTLVertexBufferLayoutDescriptor* indexBufferLayout = [[MTLVertexBufferLayoutDescriptor new] autorelease];
+	// indexBufferLayout.stride = sizeof(uint32_t);
+	// indexBufferLayout.stepFunction = MTLVertexStepFunctionPerVertex;
+	// vertexDesc.layouts[0] = indexBufferLayout;
+
+	// MTLVertexAttributeDescriptor* indexAttribute = [[MTLVertexAttributeDescriptor new] autorelease];
+	// indexAttribute.bufferIndex = 0;
+	// indexAttribute.offset = 0;
+	// indexAttribute.format = MTLVertexFormatUInt;
+	// vertexDesc.attributes[0] = indexAttribute;
+
+	// pipelineDesc.vertexDescriptor = vertexDesc;
+
 	for (size_t i = 0; i < desc->colorTargetCount; i++) {
 		const GpuColorTarget* colorTarget = &desc->colorTargets[i];
 
@@ -383,11 +399,14 @@ Mtl4Pipeline mtl4CreateGraphicsPipeline(Mtl4Function vertex, Mtl4Function fragme
 	}
 
 
+	NSError* error;
 	id<MTLRenderPipelineState> pso = [gMtl4PipelineStorage.compiler
 		newRenderPipelineStateWithDescriptor:pipelineDesc
 		compilerTaskOptions:nil
-		error:nil];
+		error:&error];
 	if (pso == nil) {
+		printf("Failed to create graphics pipeline state: %s\n", [[error localizedDescription] UTF8String]);
+
 		CMN_SET_RESULT(result, GPU_PIPELINE_IR_VALIDATION_FAILED);
 		return {};
 	}

@@ -10,6 +10,9 @@ extern const size_t		gMtl4GpuFormatPixelSize		[/*GpuFormat		*/];
 extern const MTLResourceOptions gMtl4ResourceOptionsFor		[/*GpuMemory		*/];
 extern const MTLCompareFunction gMtl4GpuOpToMtlCompareFunction	[/*GpuOp		*/];
 extern const MTLStencilOperation gMtl4GpuOpToMtlStencilOperation[/*GpuOp		*/];
+extern const MTLLoadAction	gMtl4GpuTargetOpToMtlLoadAction	[/*GpuTargetOp		*/];
+extern const MTLStoreAction	gMtl4GpuTargetOpToMtlStoreAction[/*GpuTargetOp		*/];
+extern const MTLPrimitiveType	gMtl4GpuTopologyToMtlPrimitive	[/*GpuTopology		*/];
 
 #endif // MTL4_TABLES_H
 
