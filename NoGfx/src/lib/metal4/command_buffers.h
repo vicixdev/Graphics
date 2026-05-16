@@ -3,10 +3,12 @@
 
 #include <lib/common/page.h>
 #include <lib/common/static_handle_map.h>
+#include <lib/metal4/textures.h>
 #include <lib/metal4/pipelines.h>
 #include <lib/metal4/queue.h>
 #include <lib/metal4/depthstencilstates.h>
 #include <lib/metal4/blend_states.h>
+#include <lib/metal4/encoding_context.h>
 
 #include <gpu/gpu.h>
 #include <Metal/Metal.h>
@@ -23,43 +25,43 @@ typedef enum Mtl4CommandBufferStatus {
 } Mtl4CommandBufferStatus;
 
 typedef struct Mtl4RecordedBarrier {
-	GpuStageFlags	after;
+	GpuStageFlags	before;
 	GpuHazardFlags	hazards;
 } Mtl4RecordedBarrier;
 #define MTL4_GPU_STAGES_COUNT 5
+
 
 // NOTE: Encoding a command encoder is not thread safe: It can happen from any thread, but sequential encoding
 //	is expected. The synchronization is thus expected from the user.
 typedef struct Mtl4CommandBufferMetadata {
 	Mtl4CommandBufferStatus	status;
 
-	id<MTL4CommandQueue>		queue;
-	id<MTLSharedEvent>		submitEvent;
-	id<MTL4CommandAllocator>	commandAllocator;
-
-	id<MTL4CommandBuffer>		commandBuffer;
-	id<MTL4ComputeCommandEncoder>	computeEncoder;
-	id<MTL4RenderCommandEncoder>	renderEncoder;
-
-	id<MTL4ArgumentTable>		computeArgumentTable;
-	id<MTL4ArgumentTable>		vertexArgumentTable;
-	id<MTL4ArgumentTable>		fragmentArgumentTable;
+	CmnAllocator			allocator;
 
 	Mtl4Pipeline			pipeline;
 	Mtl4DepthStencilState		depthStencil;
 	Mtl4BlendState			blend;
 	void*				textureHeapPtr;
 
-	Mtl4RecordedBarrier		renderBarrierForQueueState[MTL4_GPU_STAGES_COUNT];
+	Mtl4RecordedBarrier		barriersForQueueState[MTL4_GPU_STAGES_COUNT];
+	
+	CmnExponentialArray	<Mtl4Command, 5>	commands;
 } Mtl4CommandBufferMetadata;
 
 typedef struct Mtl4CommandBufferStorage {
-	id<MTLSharedEvent>		submitEvents		[MTL4_MAX_PARALLEL_COMMANDBUFFER_ENCODINGS];
-	id<MTL4CommandAllocator>	commandAllocators	[MTL4_MAX_PARALLEL_COMMANDBUFFER_ENCODINGS];
-	id<MTL4CommandQueue>		queues			[MTL4_MAX_PARALLEL_COMMANDBUFFER_ENCODINGS];
-	id<MTL4ArgumentTable>		computeArgumentTables	[MTL4_MAX_PARALLEL_COMMANDBUFFER_ENCODINGS];
-	id<MTL4ArgumentTable>		vertexArgumentTables	[MTL4_MAX_PARALLEL_COMMANDBUFFER_ENCODINGS];
-	id<MTL4ArgumentTable>		fragmentArgumentTables	[MTL4_MAX_PARALLEL_COMMANDBUFFER_ENCODINGS];
+	CmnPage				pages			[MTL4_MAX_PARALLEL_COMMANDBUFFER_ENCODINGS];
+	CmnArena			arenas			[MTL4_MAX_PARALLEL_COMMANDBUFFER_ENCODINGS];
+
+	Mtl4CommandEmissionContext	emissionContexts	[MTL4_MAX_PARALLEL_COMMANDBUFFER_ENCODINGS];
+	// Atomic
+	size_t				emissionContextIdx;
+	// id<MTL4CommandAllocator>	commandAllocators	[MTL4_MAX_PARALLEL_COMMANDBUFFER_ENCODINGS];
+	// id<MTL4CommandQueue>		queues			[MTL4_MAX_PARALLEL_COMMANDBUFFER_ENCODINGS];
+	// id<MTL4ArgumentTable>		computeArgumentTables	[MTL4_MAX_PARALLEL_COMMANDBUFFER_ENCODINGS];
+	// id<MTL4ArgumentTable>		vertexArgumentTables	[MTL4_MAX_PARALLEL_COMMANDBUFFER_ENCODINGS];
+	// id<MTL4ArgumentTable>		fragmentArgumentTables	[MTL4_MAX_PARALLEL_COMMANDBUFFER_ENCODINGS];
+
+	// id<MTLBuffer>			indirectDrawArgsBuffer;
 
 	// Atomic
 	uint64_t submitCount;
@@ -73,6 +75,8 @@ void mtl4InitCommandBufferStorage(GpuResult* result);
 void mtl4FiniCommandBufferStorage(void);
 
 GpuCommandBuffer mtl4StartCommandEncoding(GpuQueue queue, GpuResult* result);
+
+void mtl4Submit(Mtl4CommandEmissionContext* emitContext, GpuCommandBuffer* commandBuffers, size_t commandBufferCount, GpuResult* result);
 void mtl4Submit(GpuQueue queue, GpuCommandBuffer* commandBuffers, size_t commandBufferCount, GpuResult* result);
 void mtl4SubmitWithSignal(
 	GpuQueue queue,
@@ -103,39 +107,18 @@ void mtl4BeginRenderPass(GpuCommandBuffer cb, const GpuRenderPassDesc* desc, Gpu
 void mtl4EndRenderPass(GpuCommandBuffer cb, GpuResult* result);
 
 void mtl4DrawIndexedInstanced(GpuCommandBuffer cb, void* vertexDataGpu, void* pixelDataGpu, void* indicesGpu, uint32_t indexCount, uint32_t instanceCount, GpuResult* result);
+void mtl4DrawIndexedInstancedIndirect(GpuCommandBuffer cb, void* vertexDataGpu, void* pixelDataGpu, void* indicesGpu, void* argsGpu, GpuResult* result);
 
-bool mtl4AcquireResourcesForNewCommandBuffer(
-	Mtl4CommandBuffer* handle,
-	id<MTL4CommandQueue>* queue,
-	id<MTL4CommandAllocator>* mtlAllocator,
-	id<MTL4ArgumentTable>* computeArgumentTable,
-	id<MTL4ArgumentTable>* vertexArgumentTable,
-	id<MTL4ArgumentTable>* fragmentArgumentTable,
-	id<MTLSharedEvent>* submitEvent
-);
-// NOTE: Requires deletion-lock on gMtl4CommandBufferStorage.sync.
-void mtl4ReleaseCommandBufferResources(Mtl4CommandBuffer handle);
-bool mtl4IsCommandBufferScheduledForDeletion(Mtl4CommandBuffer commandBuffer);
+void mtl4FlushBarriers(Mtl4CommandBufferMetadata* metadata);
+void mtl4GetBarrierFor(Mtl4CommandBufferMetadata* metadata, GpuStage after, GpuStageFlags* before, GpuHazardFlags* hazards);
+void mtl4AddBarrierFor(Mtl4CommandBufferMetadata* metadata, GpuStage after, GpuStageFlags before, GpuHazardFlags hazards);
 
-void mtl4PushDebugLabel(Mtl4CommandBufferMetadata* metadata, const char* label);
-void mtl4PopDebugLabel(Mtl4CommandBufferMetadata* metadata);
-
-void mtl4EnsureValidCommandBuffer(Mtl4CommandBufferMetadata* metadata);
-void mtl4EnsureValidComputeEndoderFor(Mtl4CommandBufferMetadata* metadata);
-void mtl4FlushCommandEncoderOf(Mtl4CommandBufferMetadata* metadata);
-void mtl4FlushCommandBuffer(Mtl4CommandBufferMetadata* metadata);
-void mtl4SubmitSingleBuffer(GpuQueue queue, GpuCommandBuffer commandBuffer, id<MTLSharedEvent> event, uint64_t value, GpuResult* result);
-void mtl4StartCommandBufferExecution(Mtl4CommandBufferMetadata* metadata);
-
-bool mtl4IsStageCompute(GpuStageFlags stage);
-bool mtl4IsStageRender(GpuStageFlags stage);
-
-MTLStages mtl4GpuToMtlStage(GpuStageFlags stage);
-MTLStages mtl4GpuToMtlComputeStage(GpuStageFlags stage);
-MTLStages mtl4GpuToMtlFragmentStage(GpuStageFlags stage);
-MTL4VisibilityOptions mtl4GpuHazardsToMtlVisibilityOptions(GpuHazardFlags hazards);
+GpuResult* mtl4CopyRenderPassDesc(Mtl4CommandBufferMetadata* metadata, const GpuRenderPassDesc* desc, GpuResult* result);
 
 Mtl4CommandBufferMetadata* mtl4AcquireCommandBufferMetadataFrom(Mtl4CommandBuffer handle);
+
+Mtl4CommandEmissionContext* mtl4AcquireEmissionContext(void);
+void mtl4ReleaseEmissionContext(Mtl4CommandEmissionContext* context);
 
 inline Mtl4CommandBuffer mtl4GpuCommandBufferToHandle(GpuCommandBuffer commandBuffer) {
 	return *(Mtl4CommandBuffer*)&commandBuffer;

@@ -34,25 +34,19 @@ GpuSemaphore mtl4CreateSemaphore(uint64_t value, GpuResult* result) {
 
 	Mtl4SemaphoreMetadata metadata = {};
 
-	for (size_t i = 0; i < MTL4_MAX_PARALLEL_COMMANDBUFFER_ENCODINGS; i++) {
-		id<MTLSharedEvent> event = [gMtl4Context.device newSharedEvent];
-		if (event == nil) {
-			CMN_SET_RESULT(result, GPU_OUT_OF_CPU_MEMORY);
-			return {};
-		}
-		event.signaledValue = value;
-
-		metadata.events[i] = event;
+	metadata.event = [gMtl4Context.device newSharedEvent];
+	if (metadata.event == nil) {
+		CMN_SET_RESULT(result, GPU_OUT_OF_CPU_MEMORY);
+		return {};
 	}
+	metadata.event.signaledValue = value;
 
 	{
 		CmnScopedStorageSyncLockWrite guard(&gMtl4SemaphoreStorage.sync);
 
 		Mtl4Semaphore handle = cmnInsert(&gMtl4SemaphoreStorage.semaphores, metadata, &localResult);
 		if (localResult != CMN_SUCCESS) {
-			for (size_t i = 0; i < MTL4_MAX_PARALLEL_COMMANDBUFFER_ENCODINGS; i++) {
-				[metadata.events[i] release];
-			}
+			[metadata.event release];
 
 			CMN_SET_RESULT(result, GPU_OUT_OF_CPU_MEMORY);
 			return {};
@@ -73,9 +67,7 @@ void mtl4WaitSemaphore(GpuSemaphore sema, uint64_t value, GpuResult* result) {
 	}
 	defer (mtl4ReleaseSemaphoreMetadata());
 
-	for (size_t i = 0; i < metadata->lastSignalCount; i++) {
-		[metadata->events[i] waitUntilSignaledValue:value timeoutMS:-1];
-	}
+	[metadata->event waitUntilSignaledValue:value timeoutMS:-1];
 
 	CMN_SET_RESULT(result, GPU_SUCCESS);
 	return;

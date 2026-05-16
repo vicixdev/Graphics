@@ -83,8 +83,8 @@ bool cmnAtomicCompareExchangeWeak(T* ptr, T* expected, T value, CmnMemoryOrder s
 }
 
 template <typename T>
-void cmnAtomicAdd(T* ptr, T value, CmnMemoryOrder order) {
-	__atomic_fetch_add(ptr, value, gCmnMemoryOrderToGnu[order]);
+T cmnAtomicAdd(T* ptr, T value, CmnMemoryOrder order) {
+	return __atomic_fetch_add(ptr, value, gCmnMemoryOrderToGnu[order]);
 }
 
 template <typename T>

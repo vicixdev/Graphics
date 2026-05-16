@@ -98,7 +98,7 @@ template <typename T> bool cmnAtomicCompareExchangeWeak(T* ptr, T* expected, T v
 // - ptr: Pointer to atomic storage.
 // - value: Addend.
 // - order: Memory ordering constraint.
-template <typename T> void cmnAtomicAdd(T* ptr, T value, CmnMemoryOrder order = CMN_SEQ_CST);
+template <typename T> T cmnAtomicAdd(T* ptr, T value, CmnMemoryOrder order = CMN_SEQ_CST);
 
 // Atomically subtracts value from *ptr.
 //

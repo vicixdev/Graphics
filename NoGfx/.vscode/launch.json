@@ -108,6 +108,32 @@
                 // "MTL_CAPTURE_ENABLED": "1"
             },
             "cwd": "${workspaceFolder}/examples/07b_TriangleWithBarriers"
+        },
+        {
+            "type": "lldb",
+            "request": "launch",
+            "name": "08_TexturedRectangle",
+            "program": "${workspaceFolder}/examples/08_TexturedRectangle/out",
+            "args": [],
+            "env": {
+                "MTL_DEBUG_LAYER": "1",
+                // "MTL_DEBUG_LAYER_WARNING_MODE": "nslog",
+                // "MTL_CAPTURE_ENABLED": "1"
+            },
+            "cwd": "${workspaceFolder}/examples/08_TexturedRectangle"
+        },
+        {
+            "type": "lldb",
+            "request": "launch",
+            "name": "09_IndirectTexturedRectangle",
+            "program": "${workspaceFolder}/examples/09_IndirectTexturedRectangle/out",
+            "args": [],
+            "env": {
+                "MTL_DEBUG_LAYER": "1",
+                // "MTL_DEBUG_LAYER_WARNING_MODE": "nslog",
+                // "MTL_CAPTURE_ENABLED": "1"
+            },
+            "cwd": "${workspaceFolder}/examples/09_IndirectTexturedRectangle"
         }
     ]
 }

@@ -1,9 +1,9 @@
 #include "validation.h"
 
+#include <lib/common/memory.h>
 #include <lib/metal4/context.h>
 #include <lib/metal4/allocation.h>
 #include <lib/metal4/textures.h>
-#include <lib/common/memory.h>
 
 static uint32_t mtl4MaxMipCountFor(const GpuTextureDesc* desc) {
 	uint32_t maxDimension = desc->dimensions[0];
@@ -303,6 +303,34 @@ bool mtl4ValidateGpuTextureRWViewDescriptor(GpuTexture texture, const GpuViewDes
 	return mtl4ValidateGpuTextureViewDescriptor(texture, desc, result);
 }
 
+bool mtl4CheckSynchronization(Mtl4CommandBufferMetadata* metadata, GpuStageFlags before, GpuStageFlags after, GpuResult* result) {
+	// if (metadata->renderEncoder != nil && (mtl4IsStageRender(before) || mtl4IsStageRender(after))) {
+		// CMN_SET_RESULT(result, GPU_SYNCHRONIZATION_WHILE_ENCODING_RENDERPASS);
+		// return false;
+	// }
+
+	CMN_SET_RESULT(result, GPU_SUCCESS);
+	return true;
+}
+
+bool mtl4ValidateBarrier(GpuCommandBuffer cb, GpuStageFlags before, GpuStageFlags after, GpuHazardFlags hazards, GpuResult* result) {
+	(void)hazards;
+
+	Mtl4CommandBuffer handle = mtl4GpuCommandBufferToHandle(cb);
+	Mtl4CommandBufferMetadata* metadata = mtl4AcquireCommandBufferMetadataFrom(handle);
+	if (metadata == nullptr) {
+		CMN_SET_RESULT(result, GPU_NO_SUCH_COMMAND_BUFFER_FOUND);
+		return false;
+	}
+
+	if (!mtl4CheckSynchronization(metadata, before, after, result)) {
+		return false;
+	}
+
+	CMN_SET_RESULT(result, GPU_SUCCESS);
+	return true;
+}
+
 bool mtl4ValidateGpuSignalAfter(GpuCommandBuffer cb, GpuStageFlags before, void* ptrGpu, uint64_t value, GpuSignal signal, GpuResult* result) {
 	(void)cb;
 	(void)before;
@@ -332,6 +360,17 @@ bool mtl4ValidateGpuWaitBefore(GpuCommandBuffer cb, GpuStageFlags after, void* p
 
 	if (mask != GPU_DEFAULT_WAIT_MASK) {
 		CMN_SET_RESULT(result, GPU_UNSUPPORTED_OPERATION);
+		return false;
+	}
+
+	Mtl4CommandBuffer handle = mtl4GpuCommandBufferToHandle(cb);
+	Mtl4CommandBufferMetadata* metadata = mtl4AcquireCommandBufferMetadataFrom(handle);
+	if (metadata == nullptr) {
+		CMN_SET_RESULT(result, GPU_NO_SUCH_COMMAND_BUFFER_FOUND);
+		return false;
+	}
+
+	if (!mtl4CheckSynchronization(metadata, 0, after, result)) {
 		return false;
 	}
 

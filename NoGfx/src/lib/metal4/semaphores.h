@@ -5,14 +5,12 @@
 #include <Metal/Metal.h>
 #include <lib/common/page.h>
 #include <lib/common/storage_sync.h>
-#include <lib/metal4/command_buffers.h>
+// #include <lib/metal4/command_buffers.h>
 
 typedef CmnHandle Mtl4Semaphore;
 
 typedef struct Mtl4SemaphoreMetadata {
-	id<MTLSharedEvent>	events	[MTL4_MAX_PARALLEL_COMMANDBUFFER_ENCODINGS];
-	size_t	lastSignalCount;
-	CmnMutex mutex;
+	id<MTLSharedEvent>	event;
 } Mtl4SemaphoreMetadata;
 
 typedef struct Mtl4SemaphoreStorage {

@@ -37,6 +37,7 @@ typedef enum GpuResult {
 
 	GPU_TOO_MANY_UNSUBMITTED_COMMAND_BUFFERS,
 	GPU_ALREADY_SUBMITTED,
+	GPU_SYNCHRONIZATION_WHILE_ENCODING_RENDERPASS,
 
 	GPU_COUND_NOT_CREATE_QUEUE,
 	GPU_COUND_NOT_CREATE_COMMAND_BUFFER,
@@ -321,6 +322,15 @@ typedef struct GpuRenderPassDesc {
 	size_t colorTargetCount;
 } GpuRenderPassDesc;
 
+typedef struct GpuIndirectDispatchArgs {
+	uint32_t gridDimensions[3];
+	uint32_t _pad;
+} GpuIndirectDispatchArgs;
+
+typedef struct GpuIndirectDrawArgs {
+	uint32_t indexCount;
+	uint32_t instanceCount;
+} GpuIndirectDrawArgs;
 
 struct GpuInitDesc;
 

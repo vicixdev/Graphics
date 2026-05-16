@@ -169,18 +169,18 @@ void mtl4SignalEvent(
 
 	size_t fenceUploadValueOffset = mtl4UploadFenceValue(value);
 
-	mtl4FlushCommandEncoderOf(commandBuffer);
-	mtl4EnsureValidComputeEndoderFor(commandBuffer);
-	[commandBuffer->computeEncoder barrierAfterQueueStages:MTLStageAll beforeStages:MTLStageBlit visibilityOptions:MTL4VisibilityOptionDevice | MTL4VisibilityOptionResourceAlias];
-	[commandBuffer->computeEncoder
-		copyFromBuffer:gMtl4EventStorage.signaledValuesUploadBuffer
-		sourceOffset:fenceUploadValueOffset
-		toBuffer:allocation->buffer
-		destinationOffset:gpuPtrOffsetFromBase
-		size:sizeof(uint64_t)];
+	// mtl4FlushCommandEncoderOf(commandBuffer);
+	// mtl4EnsureValidComputeEndoderFor(commandBuffer);
+	// [commandBuffer->computeEncoder barrierAfterQueueStages:MTLStageAll beforeStages:MTLStageBlit visibilityOptions:MTL4VisibilityOptionDevice | MTL4VisibilityOptionResourceAlias];
+	// [commandBuffer->computeEncoder
+	// 	copyFromBuffer:gMtl4EventStorage.signaledValuesUploadBuffer
+	// 	sourceOffset:fenceUploadValueOffset
+	// 	toBuffer:allocation->buffer
+	// 	destinationOffset:gpuPtrOffsetFromBase
+	// 	size:sizeof(uint64_t)];
 
-	mtl4FlushCommandBuffer(commandBuffer);
-	[commandBuffer->queue signalEvent:event value:value];
+	// mtl4FlushCommandBuffer(commandBuffer);
+	// [commandBuffer->queue signalEvent:event value:value];
 }
 
 
@@ -202,8 +202,8 @@ void mtl4WaitEvent(
 	}
 	defer (mtl4ReleaseEvent());
 
-	mtl4FlushCommandBuffer(commandBuffer);
-	[commandBuffer->queue waitForEvent:event value:value];
+	// mtl4FlushCommandBuffer(commandBuffer);
+	// [commandBuffer->queue waitForEvent:event value:value];
 
 	CMN_SET_RESULT(result, GPU_SUCCESS);
 }
