@@ -22,6 +22,12 @@ typedef enum Mtl4CommandBufferStatus {
 	MTL4_COMMAND_BUFFER_SUBMITTED,
 } Mtl4CommandBufferStatus;
 
+typedef struct Mtl4RecordedBarrier {
+	GpuStageFlags	after;
+	GpuHazardFlags	hazards;
+} Mtl4RecordedBarrier;
+#define MTL4_GPU_STAGES_COUNT 5
+
 // NOTE: Encoding a command encoder is not thread safe: It can happen from any thread, but sequential encoding
 //	is expected. The synchronization is thus expected from the user.
 typedef struct Mtl4CommandBufferMetadata {
@@ -43,6 +49,8 @@ typedef struct Mtl4CommandBufferMetadata {
 	Mtl4DepthStencilState		depthStencil;
 	Mtl4BlendState			blend;
 	void*				textureHeapPtr;
+
+	Mtl4RecordedBarrier		renderBarrierForQueueState[MTL4_GPU_STAGES_COUNT];
 } Mtl4CommandBufferMetadata;
 
 typedef struct Mtl4CommandBufferStorage {

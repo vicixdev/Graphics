@@ -423,7 +423,7 @@ void mtl4Barrier(GpuCommandBuffer cb, GpuStageFlags before, GpuStageFlags after,
 	MTLStages metalAfter = mtl4GpuToMtlStage(after);
 	MTL4VisibilityOptions metalVisibilityOptions = mtl4GpuHazardsToMtlVisibilityOptions(hazards);
 
-	// TODO: Figure out render stuff...
+	// TODO: Validate that there is not an active render pass...
 
 	if (mtl4IsStageCompute(before)) {
 		mtl4FlushCommandEncoderOf(metadata);
@@ -435,6 +435,17 @@ void mtl4Barrier(GpuCommandBuffer cb, GpuStageFlags before, GpuStageFlags after,
 			barrierAfterQueueStages:metalBefore
 			beforeStages:metalAfter & (MTLStageBlit | MTLStageDispatch)
 			visibilityOptions:metalVisibilityOptions];
+	}
+
+	for (size_t i = 0; i < MTL4_GPU_STAGES_COUNT; i++) {
+		GpuStage stage = (GpuStage)(1 << i);
+
+		if (!(before & stage)) {
+			continue;
+		}
+
+		metadata->renderBarrierForQueueState[i].after |= after & (GPU_STAGE_PIXEL_SHADER | GPU_STAGE_RASTER_COLOR_OUT | GPU_STAGE_VERTEX_SHADER);
+		metadata->renderBarrierForQueueState[i].hazards |= hazards;
 	}
 
 	CMN_SET_RESULT(result, GPU_SUCCESS);
@@ -631,6 +642,23 @@ void mtl4BeginRenderPass(GpuCommandBuffer cb, const GpuRenderPassDesc* desc, Gpu
 
 	mtl4EnsureValidCommandBuffer(metadata);
 	metadata->renderEncoder = [metadata->commandBuffer renderCommandEncoderWithDescriptor:renderPassDesc];
+
+	for (size_t i = 0; i < MTL4_GPU_STAGES_COUNT; i++) {
+		GpuStage stage = (GpuStage)(1 << i);
+
+		if (metadata->renderBarrierForQueueState[i].after == 0) {
+			continue;
+		}
+
+		MTLStages before = mtl4GpuToMtlStage(stage);
+		MTLStages after = mtl4GpuToMtlStage(metadata->renderBarrierForQueueState[i].after);
+		MTL4VisibilityOptions visibility = mtl4GpuHazardsToMtlVisibilityOptions(metadata->renderBarrierForQueueState[i].hazards);
+
+		[metadata->renderEncoder
+			barrierAfterQueueStages:before
+			beforeStages:after
+			visibilityOptions:visibility];
+	}
 }
 
 void mtl4EndRenderPass(GpuCommandBuffer cb, GpuResult* result) {
@@ -830,14 +858,14 @@ MTLStages mtl4GpuToMtlStage(GpuStageFlags stage) {
 		stages |= MTLStageFragment;
 	}
 	if (stage & GPU_STAGE_RASTER_COLOR_OUT) {
-		stages |= MTLStageTile;
+		stages |= MTLStageFragment;
 	}
 
 	return stages;
 }
 
 MTL4VisibilityOptions mtl4GpuHazardsToMtlVisibilityOptions(GpuHazardFlags hazards) {
-	MTL4VisibilityOptions options = MTL4VisibilityOptionNone;
+	MTL4VisibilityOptions options = MTL4VisibilityOptionDevice;
 
 	if (hazards & GPU_HAZARD_DESCRIPTORS) {
 		options |= MTL4VisibilityOptionResourceAlias;

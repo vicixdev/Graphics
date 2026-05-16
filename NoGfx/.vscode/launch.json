@@ -95,6 +95,19 @@
                 // "MTL_CAPTURE_ENABLED": "1"
             },
             "cwd": "${workspaceFolder}/examples/07_Triangle"
+        },
+        {
+            "type": "lldb",
+            "request": "launch",
+            "name": "07b_TriangleWithBarriers",
+            "program": "${workspaceFolder}/examples/07b_TriangleWithBarriers/out",
+            "args": [],
+            "env": {
+                "MTL_DEBUG_LAYER": "1",
+                // "MTL_DEBUG_LAYER_WARNING_MODE": "nslog",
+                // "MTL_CAPTURE_ENABLED": "1"
+            },
+            "cwd": "${workspaceFolder}/examples/07b_TriangleWithBarriers"
         }
     ]
 }
