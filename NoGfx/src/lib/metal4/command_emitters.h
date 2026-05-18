@@ -11,7 +11,7 @@ typedef struct Mtl4CommandEmissionContext {
 	// Atomic
 	bool				inUse;
 
-	id<MTL4CommandQueue>		queue;
+	Mtl4QueueMetadata*		queueMetadata;
 	id<MTL4CommandAllocator>	commandAllocator;
 
 	id<MTL4CommandBuffer>		commandBuffer;
@@ -60,3 +60,4 @@ Mtl4CommandEmissionContext* mtl4AcquireCommandEmissionContext(Mtl4Queue queue);
 void mtl4ReleaseCommandEmissionContext(Mtl4CommandEmissionContext* context);
 
 #endif // MTL4_COMMAND_EMITTER_STORAGE_H
+

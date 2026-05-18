@@ -25,7 +25,7 @@ void mtl4FlushCommandBuffer(Mtl4CommandEmissionContext* context) {
 	[context->commandBuffer endCommandBuffer];
 
 	[gMtl4AllocationStorage.residencySet commit];
-	[context->queue commit:&context->commandBuffer count:1];
+	[context->queueMetadata->queue commit:&context->commandBuffer count:1];
 
 	[context->commandBuffer release];
 	context->commandBuffer = nil;
@@ -398,7 +398,7 @@ void mtl4EmitSignal(Mtl4CommandEmissionContext* context, Mtl4Command* command, G
 		size:sizeof(uint64_t)];
 	mtl4FlushCommandBuffer(context);
 
-	[context->queue signalEvent:event value:signal->value];
+	[context->queueMetadata->queue signalEvent:event value:signal->value];
 }
 
 void mtl4EmitWait(Mtl4CommandEmissionContext* context, Mtl4Command* command, GpuResult* result) {
@@ -423,7 +423,7 @@ void mtl4EmitWait(Mtl4CommandEmissionContext* context, Mtl4Command* command, Gpu
 	defer (mtl4ReleaseAllocationMetadata());
 
 	mtl4FlushCommandBuffer(context);
-	[context->queue waitForEvent:event value:wait->value];
+	[context->queueMetadata->queue waitForEvent:event value:wait->value];
 }
 
 void mtl4EmitDrawIndirectPrep(Mtl4CommandEmissionContext* context, Mtl4RenderCommand* command, GpuResult* result) {
@@ -830,7 +830,7 @@ void mtl4EmitSemaphoreSignal(
 		return;
 	}
 
-	[context->queue
+	[context->queueMetadata->queue
 		signalEvent:semaphoreMetadata->event
 		value:value];
 }

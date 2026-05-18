@@ -207,6 +207,12 @@ void mtl4FiniCommandEmissionContext(Mtl4CommandEmissionContext* context) {
 Mtl4CommandEmissionContext* mtl4AcquireCommandEmissionContext(Mtl4Queue queue) {
 	cmnSemaphoreWait(&gMtl4CommandEmissionStorage.contextsSemaphore);
 
+	Mtl4QueueMetadata* queueMetadata = mtl4QueueMetadataOf(queue);
+	if (queueMetadata == nullptr) {
+		return nullptr;
+	}
+	mtl4LockQueue(queueMetadata);
+
 	size_t index;
 	for (;;) {
 		index = cmnAtomicAdd(&gMtl4CommandEmissionStorage.firstFreeContextIndex, 1UL) % MTL4_MAX_COMMAND_EMITTERS;
@@ -218,9 +224,8 @@ Mtl4CommandEmissionContext* mtl4AcquireCommandEmissionContext(Mtl4Queue queue) {
 
 	Mtl4CommandEmissionContext* context =  &gMtl4CommandEmissionStorage.contexts[index];
 
-	// TODO: Use the queue argument.
-	context->queue = mtl4Queue();
-	[context->queue addResidencySet:gMtl4AllocationStorage.residencySet];
+	context->queueMetadata = queueMetadata;
+	[context->queueMetadata->queue addResidencySet:gMtl4AllocationStorage.residencySet];
 
 	return context;
 }
@@ -229,6 +234,7 @@ void mtl4ReleaseCommandEmissionContext(Mtl4CommandEmissionContext* context) {
 	cmnAtomicLoad(&context->inUse);
 
 	cmnSemaphorePost(&gMtl4CommandEmissionStorage.contextsSemaphore);
+	mtl4UnlockQueue(context->queueMetadata);
 }
 
 
