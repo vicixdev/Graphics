@@ -333,6 +333,12 @@ typedef struct GpuIndirectDrawArgs {
 	uint32_t instanceCount;
 } GpuIndirectDrawArgs;
 
+typedef struct GpuMultiDrawIndirectArgs {
+	void* indices;
+	uint32_t indexCount;
+	uint32_t instanceCount;
+} GpuMultiDrawIndirectArgs;
+
 struct GpuInitDesc;
 
 typedef struct GpuLayer {

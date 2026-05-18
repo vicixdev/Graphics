@@ -55,7 +55,7 @@ GpuBaseLayer gMtl4BaseLayer = {
 	/*gpuEndRenderPass=*/				mtl4EndRenderPass,
 	/*gpuDrawIndexedInstanced=*/			mtl4DrawIndexedInstanced,
 	/*gpuDrawIndexedInstancedIndirect=*/		mtl4DrawIndexedInstancedIndirect,
-	/*gpuDrawIndexedInstancedIndirectMulti=*/	nullptr,
+	/*gpuDrawIndexedInstancedIndirectMulti=*/	mtl4DrawIndexedInstancedIndirectMulti,
 	/*gpuDrawMeshlets=*/				nullptr,
 	/*gpuDrawMeshletsIndirect=*/			nullptr,
 };

@@ -37,3 +37,5 @@
 #include <lib/metal4/validation.mm>
 #include <lib/metal4/deletion_manager.cpp>
 
+#include <lib/metal4/shader/prep_multidrawindirect.cpp>
+

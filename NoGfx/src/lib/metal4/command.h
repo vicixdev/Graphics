@@ -88,6 +88,14 @@ typedef struct Mtl4CommandDrawIndirect {
 } Mtl4CommandDrawIndirect;
 
 typedef struct Mtl4CommandMultiDrawIndirect {
+	void*				vertexData;
+	size_t				vertexStride;
+	void*				pixelData;
+	size_t				pixelStride;
+	void*				indirectArgs;
+	void*				indirectDrawCount;
+
+	size_t				preparedIcbRangeOffset;
 } Mtl4CommandMultiDrawIndirect;
 
 typedef struct Mtl4RenderCommand {
@@ -97,7 +105,6 @@ typedef struct Mtl4RenderCommand {
 	Mtl4DepthStencilState			depthStencil;
 	Mtl4BlendState				blend;
 	void*					textureHeapPtr;
-
 
 	union {
 		Mtl4CommandDraw			draw;
@@ -109,6 +116,7 @@ typedef struct Mtl4RenderCommand {
 typedef struct Mtl4CommandRenderPass {
 	const GpuRenderPassDesc*	desc;
 	bool				requiresPreparation;
+	bool				containsMultiDraw;
 
 	CmnChain<Mtl4RenderCommand>	commands;
 } Mtl4CommandRenderPass;

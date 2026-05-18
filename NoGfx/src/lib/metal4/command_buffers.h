@@ -13,7 +13,7 @@
 #include <gpu/gpu.h>
 #include <Metal/Metal.h>
 
-#define MTL4_MAX_PARALLEL_COMMANDBUFFER_ENCODINGS 16
+#define MTL4_MAX_PARALLEL_COMMANDBUFFER_ENCODINGS 4
 
 struct Mtl4SemaphoreMetadata;
 
@@ -58,14 +58,9 @@ typedef struct Mtl4CommandBufferStorage {
 	Mtl4CommandEmissionContext	emissionContexts	[MTL4_MAX_PARALLEL_COMMANDBUFFER_ENCODINGS];
 	// Atomic
 	size_t				emissionContextIdx;
-	id<MTLBuffer>			zeroBuffer;
-	// id<MTL4CommandAllocator>	commandAllocators	[MTL4_MAX_PARALLEL_COMMANDBUFFER_ENCODINGS];
-	// id<MTL4CommandQueue>		queues			[MTL4_MAX_PARALLEL_COMMANDBUFFER_ENCODINGS];
-	// id<MTL4ArgumentTable>		computeArgumentTables	[MTL4_MAX_PARALLEL_COMMANDBUFFER_ENCODINGS];
-	// id<MTL4ArgumentTable>		vertexArgumentTables	[MTL4_MAX_PARALLEL_COMMANDBUFFER_ENCODINGS];
-	// id<MTL4ArgumentTable>		fragmentArgumentTables	[MTL4_MAX_PARALLEL_COMMANDBUFFER_ENCODINGS];
 
-	// id<MTLBuffer>			indirectDrawArgsBuffer;
+	id<MTLBuffer>			zeroBuffer;
+	Mtl4Pipeline			prepareMultiDrawIcbsPipeline;
 
 	// Atomic
 	uint64_t submitCount;
@@ -112,6 +107,7 @@ void mtl4EndRenderPass(GpuCommandBuffer cb, GpuResult* result);
 
 void mtl4DrawIndexedInstanced(GpuCommandBuffer cb, void* vertexDataGpu, void* pixelDataGpu, void* indicesGpu, uint32_t indexCount, uint32_t instanceCount, GpuResult* result);
 void mtl4DrawIndexedInstancedIndirect(GpuCommandBuffer cb, void* vertexDataGpu, void* pixelDataGpu, void* indicesGpu, void* argsGpu, GpuResult* result);
+void mtl4DrawIndexedInstancedIndirectMulti(GpuCommandBuffer cb, void* dataVxGpu, uint32_t vxStride, void* dataPxGpu, uint32_t pxStride, void* argsGpu, void* drawCountGpu, GpuResult* result);
 
 void mtl4FlushBarriers(Mtl4CommandBufferMetadata* metadata);
 void mtl4GetBarrierFor(Mtl4CommandBufferMetadata* metadata, GpuStage after, GpuStageFlags* before, GpuHazardFlags* hazards);

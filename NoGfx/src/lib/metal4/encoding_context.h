@@ -9,6 +9,7 @@
 #include <lib/metal4/events.h>
 #include <lib/metal4/semaphores.h>
 #include <lib/metal4/tables.h>
+#include <lib/metal4/shader/prep_multidrawindirect.h>
 
 typedef struct Mtl4CommandEmissionContext {
 	// Atomic
@@ -32,7 +33,13 @@ typedef struct Mtl4CommandEmissionContext {
 
 	id<MTLBuffer>			zeroBuffer;
 
+	id<MTLIndirectCommandBuffer>	icbBuffer;
+	size_t				icbBufferAllocCount;
+	size_t				icbBufferLength;
+
 	MTLStages			computeUsedStages;
+
+	Mtl4Pipeline			prepareMultidrawIcbsPipeline;
 } Mtl4CommandEmissionContext;
 
 MTLStages mtl4GpuToMtlStage(GpuStageFlags stage);
@@ -86,6 +93,18 @@ inline size_t mtl4BumpAllocIn(Mtl4CommandEmissionContext* context, size_t size) 
 	return offset;
 }
 
+inline NSRange mtl4AllocIcbRangeIn(Mtl4CommandEmissionContext* context, size_t count) {
+	if (context->icbBufferAllocCount + count > context->icbBufferLength) {
+		context->icbBufferAllocCount = 0;
+	}
+
+	size_t start = context->icbBufferAllocCount;
+	context->icbBufferAllocCount += count;
+
+	return NSMakeRange(start, count);
+	
+}
+
 inline void mtl4EmitBarrierForComputeStage(Mtl4CommandEmissionContext* context, GpuStageFlags before, MTLStages stage, GpuHazardFlags hazards) {
 	if (before == 0) {
 		return;
@@ -135,8 +154,8 @@ inline void mtl4EmitRenderpassBarriers(Mtl4CommandEmissionContext* context, Mtl4
 
 		MTLStages mtlVertexBefore = MTLStageBlit | MTLStageDispatch;
 		MTLStages mtlFragmentBefore = mtl4GpuToMtlStage(command->renderBarrier.fragment.stages)  | (MTLStageBlit | MTLStageDispatch);
-		MTL4VisibilityOptions mtlVertexVisibility = mtl4GpuToMtlStage(command->renderBarrier.vertex.hazards);
-		MTL4VisibilityOptions mtlFragmentVisibility = mtl4GpuToMtlStage(command->renderBarrier.fragment.hazards);
+		MTL4VisibilityOptions mtlVertexVisibility = mtl4GpuHazardsToMtlVisibilityOptions(command->renderBarrier.vertex.hazards);
+		MTL4VisibilityOptions mtlFragmentVisibility = mtl4GpuHazardsToMtlVisibilityOptions(command->renderBarrier.fragment.hazards);
 
 		[context->renderEncoder
 			barrierAfterQueueStages:mtlVertexBefore
@@ -482,6 +501,51 @@ inline void mtl4EmitDrawIndirectPrep(Mtl4CommandEmissionContext* context, Mtl4Re
 	draw->preparedIndirectArgsOffset = argsOffset;
 }
 
+inline void mtl4EmitMultiDrawIndirectPrep(Mtl4CommandEmissionContext* context, Mtl4RenderCommand* command, GpuResult* result) {
+	assert(command->type == MTL4_CMD_MULTIDRAW_INDIRECT);
+
+	Mtl4CommandMultiDrawIndirect* draw = &command->multiDrawIndirect;
+
+	NSRange icbRange = mtl4AllocIcbRangeIn(context, 2048);
+
+	Mtl4PipelineMetadata* prepareIcbsPipelineMetadata = mtl4AcquirePipelineMetadataFrom(context->prepareMultidrawIcbsPipeline);
+	assert(prepareIcbsPipelineMetadata != nullptr && "The builtin pipeline could not be found.");
+	defer (mtl4ReleasePipelineMetadata());
+
+	size_t argsOffset = mtl4BumpAllocIn(context, sizeof(Mtl4PrepareMultidrawIndirectIcbsArgs));
+	Mtl4PrepareMultidrawIndirectIcbsArgs* args = (Mtl4PrepareMultidrawIndirectIcbsArgs*)((uintptr_t)[context->bumpBuffer contents] + argsOffset);
+
+	size_t rangeOffset = mtl4BumpAllocIn(context, sizeof(MTLIndirectCommandBufferExecutionRange));
+
+	Mtl4PipelineMetadata* drawPipelineMetadata = mtl4AcquirePipelineMetadataFrom(command->pipeline);
+	if (drawPipelineMetadata == nullptr) {
+		CMN_SET_RESULT(result, GPU_NO_SUCH_PIPELINE_FOUND);
+		return;
+	}
+	defer (mtl4ReleasePipelineMetadata());
+
+	args->commandBuffer = [context->icbBuffer gpuResourceID];
+	args->icbStartOffset = icbRange.location;
+	args->primitive = gMtl4GpuTopologyToMtlPrimitive[drawPipelineMetadata->graphics.desc.topology];
+	args->textureHeap = (uintptr_t)command->textureHeapPtr;
+	args->vertexData = (uintptr_t)draw->vertexData;
+	args->vertexStride = draw->vertexStride;
+	args->fragmentData = (uintptr_t)draw->pixelData;
+	args->fragmentStride = draw->pixelStride;
+	args->args = (uintptr_t)draw->indirectArgs;
+	args->argCount = (uintptr_t)draw->indirectDrawCount;
+	args->outRange = [context->bumpBuffer gpuAddress] + rangeOffset;
+
+	[context->computeArgumentTable setAddress:[context->bumpBuffer gpuAddress] + argsOffset atIndex:0];
+
+	mtl4EnsureValidComputeEncoder(context);
+	[context->computeEncoder setComputePipelineState:prepareIcbsPipelineMetadata->compute.pso];
+	[context->computeEncoder setArgumentTable:context->computeArgumentTable];
+	[context->computeEncoder dispatchThreads:MTLSizeMake(2048, 1, 1) threadsPerThreadgroup:MTLSizeMake(128, 1, 1)];
+
+	draw->preparedIcbRangeOffset = rangeOffset;
+}
+
 inline void mtl4EmitRenderpassPrep(Mtl4CommandEmissionContext* context, Mtl4Command* command, GpuResult* result) {
 	assert(command->type == MTL4_CMD_RENDERPASS);
 
@@ -505,6 +569,11 @@ inline void mtl4EmitRenderpassPrep(Mtl4CommandEmissionContext* context, Mtl4Comm
 				break;
 			}
 			case MTL4_CMD_MULTIDRAW_INDIRECT: {
+				mtl4EmitMultiDrawIndirectPrep(context, renderCommand, &localResult);
+				if (localResult != GPU_SUCCESS) {
+					lastError = localResult;
+				}
+
 				break;
 			}
 			default: break;
@@ -665,6 +734,21 @@ inline void mtl4EmitDrawIndirect(Mtl4CommandEmissionContext* context, Mtl4Render
 		indexBuffer:(uintptr_t)draw->indices
 		indexBufferLength:indicesLength
 		indirectBuffer:[context->bumpBuffer gpuAddress] + draw->preparedIndirectArgsOffset];
+
+	CMN_SET_RESULT(result, GPU_SUCCESS);
+}
+
+inline void mtl4EmitMultiDrawIndirect(Mtl4CommandEmissionContext* context, Mtl4RenderCommand* command, GpuResult* result) {
+	assert(command->type == MTL4_CMD_MULTIDRAW_INDIRECT);
+
+	Mtl4CommandMultiDrawIndirect* draw = &command->multiDrawIndirect;
+
+	mtl4EmitDrawSetup(context, command, result);
+	[context->renderEncoder
+		executeCommandsInBuffer:context->icbBuffer
+		indirectBuffer:[context->bumpBuffer gpuAddress] + draw->preparedIcbRangeOffset];
+
+	CMN_SET_RESULT(result, GPU_SUCCESS);
 }
 
 inline void mtl4EmitRenderpass(Mtl4CommandEmissionContext* context, Mtl4Command* command, GpuResult* result) {
@@ -674,8 +758,18 @@ inline void mtl4EmitRenderpass(Mtl4CommandEmissionContext* context, Mtl4Command*
 		mtl4EmitRenderpassPrep(context, command, result);
 	}
 
+	// if (command->renderPass.containsMultiDraw) {
+	// 	id<MTLEvent> event = [gMtl4Context.device newEvent];
+
+	// 	mtl4FlushCommandBuffer(context);
+	// 	[context->queue signalEvent:event value:42];
+	// 	[context->queue waitForEvent:event value:42];
+	// }
+
 	mtl4EmitBeginRenderpass(context, command, result);
-	mtl4EmitRenderpassBarriers(context, command);
+	// if (!command->renderPass.containsMultiDraw) {
+		mtl4EmitRenderpassBarriers(context, command);
+	// }
 
 	CmnChainIterator<Mtl4RenderCommand> iter;
 	cmnCreateChainIterator((CmnChain<Mtl4RenderCommand>*)&command->renderPass.commands, &iter);
@@ -692,6 +786,7 @@ inline void mtl4EmitRenderpass(Mtl4CommandEmissionContext* context, Mtl4Command*
 				break;
 			}
 			case MTL4_CMD_MULTIDRAW_INDIRECT: {
+				mtl4EmitMultiDrawIndirect(context, renderCommand, result);
 				break;
 			}
 		}
@@ -699,6 +794,14 @@ inline void mtl4EmitRenderpass(Mtl4CommandEmissionContext* context, Mtl4Command*
 
 	[context->renderEncoder endEncoding];
 	context->renderEncoder = nil;
+
+	if (command->renderPass.containsMultiDraw) {
+		id<MTLEvent> event = [gMtl4Context.device newEvent];
+
+		mtl4FlushCommandBuffer(context);
+		[context->queue signalEvent:event value:42];
+		[context->queue waitForEvent:event value:42];
+	}
 
 	CMN_SET_RESULT(result, GPU_SUCCESS);
 }

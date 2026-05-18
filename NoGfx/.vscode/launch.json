@@ -134,6 +134,19 @@
                 // "MTL_CAPTURE_ENABLED": "1"
             },
             "cwd": "${workspaceFolder}/examples/09_IndirectTexturedRectangle"
+        },
+        {
+            "type": "lldb",
+            "request": "launch",
+            "name": "0A_MultiDrawIndirect",
+            "program": "${workspaceFolder}/examples/0A_MultiDrawIndirect/out",
+            "args": [],
+            "env": {
+                "MTL_DEBUG_LAYER": "1",
+                // "MTL_DEBUG_LAYER_WARNING_MODE": "nslog",
+                // "MTL_CAPTURE_ENABLED": "1"
+            },
+            "cwd": "${workspaceFolder}/examples/0A_MultiDrawIndirect"
         }
     ]
 }

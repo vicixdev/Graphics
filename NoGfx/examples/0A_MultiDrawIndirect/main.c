@@ -339,7 +339,7 @@ void beginMainRenderpassOnFramebuffer(GpuCommandBuffer cb) {
 	frameBufferTarget.texture = gGpuContext.framebuffer;
 	frameBufferTarget.loadOp = GPU_OP_CLEAR;
 	frameBufferTarget.storeOp = GPU_OP_STORE;
-	frameBufferTarget.clearColor[0] = 0.0;
+	frameBufferTarget.clearColor[0] = 1.0;
 	frameBufferTarget.clearColor[1] = 0.0;
 	frameBufferTarget.clearColor[2] = 0.0;
 	frameBufferTarget.clearColor[3] = 1.0;
@@ -368,14 +368,19 @@ void draw(GpuCommandBuffer cb) {
 	args->positions = gGpuContext.positions.gpu;
 	args->uvs = gGpuContext.uvs.gpu;
 
-	GpuAllocation indirectArgsAlloc = gpuBumpAlloc(&gGpuContext.bump, sizeof(Arguments));
-	GpuIndirectDrawArgs* indirectArgs = (GpuIndirectDrawArgs*)indirectArgsAlloc.cpu;
+	GpuAllocation indirectArgsAlloc = gpuBumpAlloc(&gGpuContext.bump, sizeof(GpuMultiDrawIndirectArgs));
+	GpuMultiDrawIndirectArgs* indirectArgs = (GpuMultiDrawIndirectArgs*)indirectArgsAlloc.cpu;
+	indirectArgs->indices = gGpuContext.indices.gpu;
 	indirectArgs->indexCount = 6;
 	indirectArgs->instanceCount = 4;
 
+	GpuAllocation drawCountAlloc = gpuBumpAlloc(&gGpuContext.bump, sizeof(uint32_t));
+	uint32_t* drawCount = (uint32_t*)drawCountAlloc.cpu;
+	*drawCount = 1;
+
 	gpuSetActiveTextureHeapPtr(cb, textureHeapAlloc.gpu, NULL);
 	gpuSetPipeline(cb, gGpuContext.pipeline, NULL);
-	gpuDrawIndexedInstancedIndirect(cb, argsAlloc.gpu, NULL, gGpuContext.indices.gpu, indirectArgsAlloc.gpu, NULL);
+	gpuDrawIndexedInstancedIndirectMulti(cb, argsAlloc.gpu, sizeof(Arguments), NULL, 0, indirectArgsAlloc.gpu, drawCountAlloc.gpu, NULL);
 }
 
 int main(void) {
@@ -387,7 +392,7 @@ int main(void) {
 	GpuCommandBuffer cb = gpuStartCommandEncoding(gGpuContext.queue, NULL);
 
 	gGpuContext.texture = loadTexture(cb, "./image.png", &gGpuContext.textureMemory);
-	gpuBarrier(cb, GPU_STAGE_TRANSFER, GPU_STAGE_PIXEL_SHADER, GPU_HAZARD_NONE, NULL);
+	gpuBarrier(cb, GPU_STAGE_TRANSFER, GPU_STAGE_PIXEL_SHADER, GPU_HAZARD_DESCRIPTORS, NULL);
 
 	beginMainRenderpassOnFramebuffer(cb);
 		draw(cb);
