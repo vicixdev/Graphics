@@ -2,6 +2,7 @@
 #define MTL4_COMMAND_H
 
 #include <gpu/gpu.h>
+#include <lib/common/chain.h>
 #include <lib/metal4/textures.h>
 #include <lib/metal4/pipelines.h>
 #include <lib/metal4/depthstencilstates.h>
@@ -18,12 +19,14 @@ typedef enum Mtl4CommandType {
 	MTL4_CMD_SIGNAL,
 	MTL4_CMD_WAIT,
 
-	MTL4_CMD_BEGIN_RENDERPASS,
-	MTL4_CMD_END_RENDERPASS,
+	MTL4_CMD_RENDERPASS,
+} Mtl4CommandType;
+
+typedef enum Mtl4RenderCommandType {
 	MTL4_CMD_DRAW,
 	MTL4_CMD_DRAW_INDIRECT,
 	MTL4_CMD_MULTIDRAW_INDIRECT,
-} Mtl4CommandType;
+} Mtl4RenderCommandType;
 
 typedef struct Mtl4CommandCopyBufferToBuffer {
 	void*	destination;
@@ -67,19 +70,7 @@ typedef struct Mtl4CommandDispatchIndirect {
 	void*		indirectArgs;
 } Mtl4CommandDispatchIndirect;
 
-typedef struct Mtl4CommandBeginRenderPass {
-	const GpuRenderPassDesc*	renderPass;
-} Mtl4CommandBeginRenderPass;
-
-typedef struct Mtl4CommandEndRenderPass {
-} Mtl4CommandEndRenderPass;
-
 typedef struct Mtl4CommandDraw {
-	Mtl4Pipeline			pipeline;
-	Mtl4DepthStencilState		depthStencil;
-	Mtl4BlendState			blend;
-	void*				textureHeapPtr;
-
 	void*				vertexData;
 	void*				pixelData;
 	void*				indices;
@@ -88,26 +79,59 @@ typedef struct Mtl4CommandDraw {
 } Mtl4CommandDraw;
 
 typedef struct Mtl4CommandDrawIndirect {
-	Mtl4Pipeline			pipeline;
-	Mtl4DepthStencilState		depthStencil;
-	Mtl4BlendState			blend;
-	void*				textureHeapPtr;
-
 	void*				vertexData;
 	void*				pixelData;
 	void*				indices;
 	void*				indirectArgs;
+
+	size_t				preparedIndirectArgsOffset;
 } Mtl4CommandDrawIndirect;
 
 typedef struct Mtl4CommandMultiDrawIndirect {
 } Mtl4CommandMultiDrawIndirect;
 
+typedef struct Mtl4RenderCommand {
+	Mtl4RenderCommandType			type;
+
+	Mtl4Pipeline				pipeline;
+	Mtl4DepthStencilState			depthStencil;
+	Mtl4BlendState				blend;
+	void*					textureHeapPtr;
+
+
+	union {
+		Mtl4CommandDraw			draw;
+		Mtl4CommandDrawIndirect		drawIndirect;
+		Mtl4CommandMultiDrawIndirect	multiDrawIndirect;
+	};
+} Mtl4RenderCommand;
+
+typedef struct Mtl4CommandRenderPass {
+	const GpuRenderPassDesc*	desc;
+	bool				requiresPreparation;
+
+	CmnChain<Mtl4RenderCommand>	commands;
+} Mtl4CommandRenderPass;
+
+typedef struct Mtl4WaitBarrier {
+	GpuStageFlags	stages;
+	GpuHazardFlags	hazards;
+} Mtl4WaitBarrier;
+
+typedef struct Mtl4RenderBarrier {
+	Mtl4WaitBarrier	vertex;
+	Mtl4WaitBarrier	fragment;
+} Mtl4RenderBarrier;
+
 typedef struct Mtl4Command {
 	Mtl4CommandType	type;
 
-	// NOTE: Can be used only for compute or render pass begin.
-	GpuStageFlags	waitFor;
-	GpuHazardFlags	waitingHazards;
+	union {
+		// NOTE: Only used only for compute.
+		Mtl4WaitBarrier		barrier;
+		// NOTE: Only used for beginRenderPass
+		Mtl4RenderBarrier	renderBarrier;
+	};
 
 	union {
 		Mtl4CommandCopyBufferToBuffer	copyBufferToBuffer;
@@ -120,11 +144,7 @@ typedef struct Mtl4Command {
 		Mtl4CommandSignal		signal;
 		Mtl4CommandWait			wait;
 
-		Mtl4CommandBeginRenderPass	beginRenderPass;
-		Mtl4CommandEndRenderPass	endRenderPass;
-		Mtl4CommandDraw			draw;
-		Mtl4CommandDrawIndirect		drawIndirect;
-		Mtl4CommandMultiDrawIndirect	multiDrawIndirect;
+		Mtl4CommandRenderPass	renderPass;
 	};
 } Mtl4Command;
 

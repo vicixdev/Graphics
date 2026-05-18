@@ -100,8 +100,8 @@ int main(void) {
 	GpuRenderTarget renderTarget = {};
 	renderTarget.texture = texture;
 	renderTarget.clearColor[0] = 0.0f;
-	renderTarget.clearColor[1] = 1.0f;
-	renderTarget.clearColor[2] = 0.0f;
+	renderTarget.clearColor[1] = 0.0f;
+	renderTarget.clearColor[2] = 1.0f;
 	renderTarget.clearColor[3] = 1.0f;
 	renderTarget.loadOp = GPU_OP_CLEAR;
 	renderTarget.storeOp = GPU_OP_STORE;

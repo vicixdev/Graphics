@@ -20,6 +20,15 @@ void mtl4InitCommandBufferStorage(GpuResult* result) {
 
 	cmnCreateStaticHandleMap(&gMtl4CommandBufferStorage.commandBuffers, {});
 
+	gMtl4CommandBufferStorage.zeroBuffer = [gMtl4Context.device
+		newBufferWithLength:1024
+		options:MTLResourceStorageModePrivate
+	];
+	mtl4AddAllocationToResidencySet(gMtl4CommandBufferStorage.zeroBuffer);
+	for (size_t i = 0; i < MTL4_MAX_PARALLEL_COMMANDBUFFER_ENCODINGS; i++) {
+		gMtl4CommandBufferStorage.emissionContexts[i].zeroBuffer = gMtl4CommandBufferStorage.zeroBuffer;
+	}
+
 	for (size_t i = 0; i < MTL4_MAX_PARALLEL_COMMANDBUFFER_ENCODINGS; i++) {
 		gMtl4CommandBufferStorage.emissionContexts[i].bumpBuffer = [gMtl4Context.device
 			newBufferWithLength:1024*1024
@@ -201,7 +210,7 @@ void mtl4Submit(Mtl4CommandEmissionContext* emitContext, GpuCommandBuffer* comma
 
 	mtl4FlushCommandBuffer(emitContext);
 
-	if (lastCommandBufferError == GPU_SUCCESS && didFindAllCommandBuffers) {
+	if (lastCommandBufferError == GPU_SUCCESS && !didFindAllCommandBuffers) {
 		CMN_SET_RESULT(result, GPU_NO_SUCH_COMMAND_BUFFER_FOUND);
 	} else if (lastCommandBufferError != GPU_SUCCESS) {
 		CMN_SET_RESULT(result, lastCommandBufferError);
@@ -253,7 +262,7 @@ void mtl4MemCpy(GpuCommandBuffer cb, void* destGpu, void* srcGpu, size_t size, G
 	command.copyBufferToBuffer.source = srcGpu;
 	command.copyBufferToBuffer.size = size;
 
-	mtl4GetBarrierFor(metadata, GPU_STAGE_TRANSFER, &command.waitFor, &command.waitingHazards);
+	mtl4GetBarrierFor(metadata, GPU_STAGE_TRANSFER, &command.barrier.stages, &command.barrier.hazards);
 
 	cmnAppend(&metadata->commands, command, &localResult);
 	if (localResult != CMN_SUCCESS) {
@@ -265,8 +274,64 @@ void mtl4MemCpy(GpuCommandBuffer cb, void* destGpu, void* srcGpu, size_t size, G
 	return;
 }
 
-void mtl4CopyToTexture(GpuCommandBuffer cb, void* destGpu, void* srcGpu, GpuTexture texture, GpuResult* result) {}
-void mtl4CopyFromTexture(GpuCommandBuffer cb, void* destGpu, void* srcGpu, GpuTexture texture, GpuResult* result) {}
+void mtl4CopyToTexture(GpuCommandBuffer cb, void* destGpu, void* srcGpu, GpuTexture texture, GpuResult* result) {
+
+	CmnResult localResult;
+
+	Mtl4CommandBuffer handle = mtl4GpuCommandBufferToHandle(cb);
+	Mtl4CommandBufferMetadata* metadata = mtl4AcquireCommandBufferMetadataFrom(handle);
+	if (metadata == nullptr) {
+		CMN_SET_RESULT(result, GPU_NO_SUCH_COMMAND_BUFFER_FOUND);
+		return;
+	}
+
+	Mtl4Command command = {};
+	command.type = MTL4_CMD_COPY_BUFFER_TO_TEXTURE;
+	command.copyBufferToTexture.source = srcGpu;
+	command.copyBufferToTexture.destinationTexture = mtl4GpuTextureToHadle(texture);
+	command.copyBufferToTexture.destinationPtr = destGpu;
+
+	mtl4GetBarrierFor(metadata, GPU_STAGE_TRANSFER, &command.barrier.stages, &command.barrier.hazards);
+
+	cmnAppend(&metadata->commands, command, &localResult);
+	if (localResult != CMN_SUCCESS) {
+		CMN_SET_RESULT(result, GPU_OUT_OF_CPU_MEMORY);
+		return;
+	}
+
+	CMN_SET_RESULT(result, GPU_SUCCESS);
+	return;
+}
+
+void mtl4CopyFromTexture(GpuCommandBuffer cb, void* destGpu, void* srcGpu, GpuTexture texture, GpuResult* result) {
+
+	CmnResult localResult;
+
+	Mtl4CommandBuffer handle = mtl4GpuCommandBufferToHandle(cb);
+	Mtl4CommandBufferMetadata* metadata = mtl4AcquireCommandBufferMetadataFrom(handle);
+	if (metadata == nullptr) {
+		CMN_SET_RESULT(result, GPU_NO_SUCH_COMMAND_BUFFER_FOUND);
+		return;
+	}
+
+	Mtl4Command command = {};
+	command.type = MTL4_CMD_COPY_TEXTURE_TO_BUFFER;
+	command.copyTextureToBuffer.sourcePtr = srcGpu;
+	command.copyTextureToBuffer.sourceTexture = mtl4GpuTextureToHadle(texture);
+	command.copyTextureToBuffer.destination = destGpu;
+
+	mtl4GetBarrierFor(metadata, GPU_STAGE_TRANSFER, &command.barrier.stages, &command.barrier.hazards);
+
+	cmnAppend(&metadata->commands, command, &localResult);
+	if (localResult != CMN_SUCCESS) {
+		CMN_SET_RESULT(result, GPU_OUT_OF_CPU_MEMORY);
+		return;
+	}
+
+	CMN_SET_RESULT(result, GPU_SUCCESS);
+	return;
+	
+}
 
 void mtl4Barrier(GpuCommandBuffer cb, GpuStageFlags before, GpuStageFlags after, GpuHazardFlags hazards, GpuResult* result) {
 	Mtl4CommandBuffer handle = mtl4GpuCommandBufferToHandle(cb);
@@ -294,20 +359,6 @@ void mtl4SetPipeline(GpuCommandBuffer cb, GpuPipeline pipeline, GpuResult* resul
 		CMN_SET_RESULT(result, GPU_NO_SUCH_COMMAND_BUFFER_FOUND);
 		return;
 	}
-
-	// TODO: Move to validation
-	// Mtl4Pipeline pipelineHandle = mtl4GpuPipelineToHandle(pipeline);
-	// Mtl4PipelineMetadata* pipelineMetadata = mtl4AcquirePipelineMetadataFrom(pipelineHandle);
-	// if (pipelineMetadata == nullptr) {
-	// 	CMN_SET_RESULT(result, GPU_NO_SUCH_PIPELINE_FOUND);
-	// 	return;
-	// }
-	// defer (mtl4ReleasePipelineMetadata());
-
-	// if (pipelineMetadata->type != MTL4_PIPELINE_COMPUTE) {
-	// 	CMN_SET_RESULT(result, GPU_INCOMPATIBLE_PIPELINE);
-	// 	return;
-	// }
 
 	metadata->pipeline = mtl4GpuPipelineToHandle(pipeline);
 }
@@ -360,7 +411,7 @@ void mtl4SignalAfter(GpuCommandBuffer cb, GpuStageFlags before, void* ptrGpu, ui
 
 	Mtl4Command command = {};
 	command.type = MTL4_CMD_SIGNAL;
-	command.waitFor = before;
+	command.barrier.stages = before;
 	command.signal.signal = ptrGpu;
 	command.signal.value = value;
 
@@ -425,7 +476,7 @@ void mtl4Dispatch(GpuCommandBuffer cb, void* dataGpu, uint32_t gridDimensions[3]
 	command.dispatch.pipeline = metadata->pipeline;
 	memcpy(command.dispatch.gridDimensions, gridDimensions, sizeof(uint32_t) * 3);
 
-	mtl4GetBarrierFor(metadata, GPU_STAGE_COMPUTE, &command.waitFor, &command.waitingHazards);
+	mtl4GetBarrierFor(metadata, GPU_STAGE_COMPUTE, &command.barrier.stages, &command.barrier.stages);
 
 	cmnAppend(&metadata->commands, command, &localResult);
 	if (localResult != CMN_SUCCESS) {
@@ -454,7 +505,7 @@ void mtl4DispatchIndirect(GpuCommandBuffer cb, void* dataGpu, void* gridDimensio
 	command.dispatchIndirect.indirectArgs = gridDimensionsGpu;
 	command.dispatchIndirect.pipeline = metadata->pipeline;
 
-	mtl4GetBarrierFor(metadata, GPU_STAGE_COMPUTE, &command.waitFor, &command.waitingHazards);
+	mtl4GetBarrierFor(metadata, GPU_STAGE_COMPUTE, &command.barrier.stages, &command.barrier.stages);
 
 	cmnAppend(&metadata->commands, command, &localResult);
 	if (localResult != CMN_SUCCESS) {
@@ -466,11 +517,120 @@ void mtl4DispatchIndirect(GpuCommandBuffer cb, void* dataGpu, void* gridDimensio
 	return;
 }
 
-void mtl4BeginRenderPass(GpuCommandBuffer cb, const GpuRenderPassDesc* desc, GpuResult* result) {}
-void mtl4EndRenderPass(GpuCommandBuffer cb, GpuResult* result) {}
+void mtl4BeginRenderPass(GpuCommandBuffer cb, const GpuRenderPassDesc* desc, GpuResult* result) {
+	
+	GpuResult localResult;
 
-void mtl4DrawIndexedInstanced(GpuCommandBuffer cb, void* vertexDataGpu, void* pixelDataGpu, void* indicesGpu, uint32_t indexCount, uint32_t instanceCount, GpuResult* result) {}
-void mtl4DrawIndexedInstancedIndirect(GpuCommandBuffer cb, void* vertexDataGpu, void* pixelDataGpu, void* indicesGpu, void* argsGpu, GpuResult* result) {}
+	Mtl4CommandBuffer handle = mtl4GpuCommandBufferToHandle(cb);
+	Mtl4CommandBufferMetadata* metadata = mtl4AcquireCommandBufferMetadataFrom(handle);
+	if (metadata == nullptr) {
+		CMN_SET_RESULT(result, GPU_NO_SUCH_COMMAND_BUFFER_FOUND);
+		return;
+	}
+
+	metadata->activeRenderPass = {};
+	metadata->activeRenderPass.type = MTL4_CMD_RENDERPASS;
+	metadata->activeRenderPass.renderPass.desc = mtl4CopyRenderPassDesc(metadata, desc, &localResult);
+	if (localResult != GPU_SUCCESS) {
+		CMN_SET_RESULT(result, localResult);
+		return;
+	}
+
+	 mtl4GetBarrierFor(
+		metadata,
+		GPU_STAGE_VERTEX_SHADER,
+		&metadata->activeRenderPass.renderBarrier.vertex.stages,
+		&metadata->activeRenderPass.renderBarrier.vertex.hazards);
+	 mtl4GetBarrierFor(
+		metadata,
+		GPU_STAGE_PIXEL_SHADER,
+		&metadata->activeRenderPass.renderBarrier.fragment.stages,
+		&metadata->activeRenderPass.renderBarrier.fragment.hazards);
+
+	metadata->isEncodingRenderpass = true;
+}
+
+void mtl4EndRenderPass(GpuCommandBuffer cb, GpuResult* result) {
+	CmnResult localResult;
+
+	Mtl4CommandBuffer handle = mtl4GpuCommandBufferToHandle(cb);
+	Mtl4CommandBufferMetadata* metadata = mtl4AcquireCommandBufferMetadataFrom(handle);
+	if (metadata == nullptr) {
+		CMN_SET_RESULT(result, GPU_NO_SUCH_COMMAND_BUFFER_FOUND);
+		return;
+	}
+
+	cmnAppend(&metadata->commands, metadata->activeRenderPass, &localResult);
+	if (localResult != CMN_SUCCESS) {
+		CMN_SET_RESULT(result, GPU_OUT_OF_CPU_MEMORY);
+	} else {
+		CMN_SET_RESULT(result, GPU_SUCCESS);
+	}
+
+	metadata->activeRenderPass = {};
+	metadata->isEncodingRenderpass = false;
+}
+
+void mtl4DrawIndexedInstanced(GpuCommandBuffer cb, void* vertexDataGpu, void* pixelDataGpu, void* indicesGpu, uint32_t indexCount, uint32_t instanceCount, GpuResult* result) {
+	CmnResult localResult;
+
+	Mtl4CommandBuffer handle = mtl4GpuCommandBufferToHandle(cb);
+	Mtl4CommandBufferMetadata* metadata = mtl4AcquireCommandBufferMetadataFrom(handle);
+	if (metadata == nullptr) {
+		CMN_SET_RESULT(result, GPU_NO_SUCH_COMMAND_BUFFER_FOUND);
+		return;
+	}
+
+	Mtl4RenderCommand command = {};
+	command.type = MTL4_CMD_DRAW;
+	command.pipeline = metadata->pipeline;
+	command.textureHeapPtr = metadata->textureHeapPtr;
+	command.blend = metadata->blend;
+	command.depthStencil = metadata->depthStencil;
+	command.draw.vertexData = vertexDataGpu;
+	command.draw.pixelData = pixelDataGpu;
+	command.draw.indices = indicesGpu;
+	command.draw.indexCount = indexCount;
+	command.draw.instanceCount = instanceCount;
+
+	cmnInsert(&metadata->activeRenderPass.renderPass.commands, command, metadata->allocator, &localResult);
+	if (localResult != CMN_SUCCESS) {
+		CMN_SET_RESULT(result, GPU_OUT_OF_CPU_MEMORY);
+		return;
+	}
+
+	CMN_SET_RESULT(result, GPU_SUCCESS);
+}
+
+void mtl4DrawIndexedInstancedIndirect(GpuCommandBuffer cb, void* vertexDataGpu, void* pixelDataGpu, void* indicesGpu, void* argsGpu, GpuResult* result) {
+	CmnResult localResult;
+	
+	Mtl4CommandBuffer handle = mtl4GpuCommandBufferToHandle(cb);
+	Mtl4CommandBufferMetadata* metadata = mtl4AcquireCommandBufferMetadataFrom(handle);
+	if (metadata == nullptr) {
+		CMN_SET_RESULT(result, GPU_NO_SUCH_COMMAND_BUFFER_FOUND);
+		return;
+	}
+
+	Mtl4RenderCommand command = {};
+	command.type = MTL4_CMD_DRAW_INDIRECT;
+	command.pipeline = metadata->pipeline;
+	command.textureHeapPtr = metadata->textureHeapPtr;
+	command.blend = metadata->blend;
+	command.depthStencil = metadata->depthStencil;
+	command.drawIndirect.vertexData = vertexDataGpu;
+	command.drawIndirect.pixelData = pixelDataGpu;
+	command.drawIndirect.indices = indicesGpu;
+	command.drawIndirect.indirectArgs = argsGpu;
+
+	cmnInsert(&metadata->activeRenderPass.renderPass.commands, command, metadata->allocator, &localResult);
+	if (localResult != CMN_SUCCESS) {
+		CMN_SET_RESULT(result, GPU_OUT_OF_CPU_MEMORY);
+		return;
+	}
+
+	metadata->activeRenderPass.renderPass.requiresPreparation = true;
+}
 
 void mtl4GetBarrierFor(Mtl4CommandBufferMetadata* metadata, GpuStage after, GpuStageFlags* before, GpuHazardFlags* hazards) {
 	size_t index = __builtin_ctzll(after);
@@ -493,7 +653,46 @@ void mtl4FlushBarriers(Mtl4CommandBufferMetadata* metadata) {
 	}
 }
 
-GpuResult* mtl4CopyRenderPassDesc(Mtl4CommandBufferMetadata* metadata, const GpuRenderPassDesc* desc, GpuResult* result) {}
+GpuRenderPassDesc* mtl4CopyRenderPassDesc(Mtl4CommandBufferMetadata* metadata, const GpuRenderPassDesc* desc, GpuResult* result) {
+	CmnResult localResult;
+
+	GpuRenderPassDesc* descCopy = cmnAlloc<GpuRenderPassDesc>(metadata->allocator, &localResult);
+	if (localResult != CMN_SUCCESS) {
+		CMN_SET_RESULT(result, GPU_OUT_OF_CPU_MEMORY);
+		return nullptr;
+	}
+	memcpy(descCopy, desc, sizeof(GpuRenderPassDesc));
+
+	if (desc->depthTarget != nullptr) {
+		descCopy->depthTarget = cmnAlloc<GpuRenderTarget>(metadata->allocator, &localResult);
+		if (localResult != CMN_SUCCESS) {
+			CMN_SET_RESULT(result, GPU_OUT_OF_CPU_MEMORY);
+			return nullptr;
+		}
+		memcpy(descCopy->depthTarget, desc->depthTarget, sizeof(GpuRenderTarget));
+	}
+
+	if (desc->stencilTarget != nullptr) {
+		descCopy->stencilTarget = cmnAlloc<GpuRenderTarget>(metadata->allocator, &localResult);
+		if (localResult != CMN_SUCCESS) {
+			CMN_SET_RESULT(result, GPU_OUT_OF_CPU_MEMORY);
+			return nullptr;
+		}
+		memcpy(descCopy->stencilTarget, desc->stencilTarget, sizeof(GpuRenderTarget));
+	}
+
+	if (desc->colorTargets != nullptr) {
+		descCopy->colorTargets = cmnAlloc<GpuRenderTarget>(metadata->allocator, desc->colorTargetCount, &localResult);
+		if (localResult != CMN_SUCCESS) {
+			CMN_SET_RESULT(result, GPU_OUT_OF_CPU_MEMORY);
+			return nullptr;
+		}
+		memcpy(descCopy->colorTargets, desc->colorTargets, sizeof(GpuRenderTarget) * desc->colorTargetCount);
+	}
+
+	CMN_SET_RESULT(result, GPU_SUCCESS);
+	return descCopy;
+}
 
 Mtl4CommandEmissionContext* mtl4AcquireEmissionContext(void) {
 	size_t index;

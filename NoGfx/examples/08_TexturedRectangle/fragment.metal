@@ -3,7 +3,8 @@
 using namespace metal;
 
 struct GpuTextureDescriptor {
-	uint64_t _desc[4];
+	texture2d<float> _tex;
+	uint64_t _desc[3];
 };
 
 struct FragmentData {};
@@ -13,8 +14,9 @@ struct FragmentIn {
 };
 
 device texture2d<float>& getTextureAt(device GpuTextureDescriptor* heap, uint index) {
-	device uint64_t& textureId = heap[index]._desc[0];
-	return reinterpret_cast<device texture2d<float>&>(textureId);
+	// device uint64_t& textureId = heap[index]._desc[0];
+	// return reinterpret_cast<device texture2d<float>&>(textureId);
+	return heap[index]._tex;
 }
  
 [[host_name("main")]]

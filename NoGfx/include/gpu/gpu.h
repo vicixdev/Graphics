@@ -121,6 +121,7 @@ typedef enum GpuStage {
 	GPU_STAGE_RASTER_COLOR_OUT = 0x4,
 	GPU_STAGE_PIXEL_SHADER = 0x8,
 	GPU_STAGE_VERTEX_SHADER = 0x10,
+	GPU_STAGE_RASTER_DEPTHSTENCIL_OUT = 0x20,
 } GpuStage;
 typedef size_t GpuStageFlags; // bitfield of GpuStage
 

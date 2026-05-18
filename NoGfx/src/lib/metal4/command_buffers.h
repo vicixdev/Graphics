@@ -28,7 +28,7 @@ typedef struct Mtl4RecordedBarrier {
 	GpuStageFlags	before;
 	GpuHazardFlags	hazards;
 } Mtl4RecordedBarrier;
-#define MTL4_GPU_STAGES_COUNT 5
+#define MTL4_GPU_STAGES_COUNT 6
 
 
 // NOTE: Encoding a command encoder is not thread safe: It can happen from any thread, but sequential encoding
@@ -44,6 +44,9 @@ typedef struct Mtl4CommandBufferMetadata {
 	void*				textureHeapPtr;
 
 	Mtl4RecordedBarrier		barriersForQueueState[MTL4_GPU_STAGES_COUNT];
+
+	bool				isEncodingRenderpass;
+	Mtl4Command			activeRenderPass;
 	
 	CmnExponentialArray	<Mtl4Command, 5>	commands;
 } Mtl4CommandBufferMetadata;
@@ -55,6 +58,7 @@ typedef struct Mtl4CommandBufferStorage {
 	Mtl4CommandEmissionContext	emissionContexts	[MTL4_MAX_PARALLEL_COMMANDBUFFER_ENCODINGS];
 	// Atomic
 	size_t				emissionContextIdx;
+	id<MTLBuffer>			zeroBuffer;
 	// id<MTL4CommandAllocator>	commandAllocators	[MTL4_MAX_PARALLEL_COMMANDBUFFER_ENCODINGS];
 	// id<MTL4CommandQueue>		queues			[MTL4_MAX_PARALLEL_COMMANDBUFFER_ENCODINGS];
 	// id<MTL4ArgumentTable>		computeArgumentTables	[MTL4_MAX_PARALLEL_COMMANDBUFFER_ENCODINGS];
@@ -113,7 +117,7 @@ void mtl4FlushBarriers(Mtl4CommandBufferMetadata* metadata);
 void mtl4GetBarrierFor(Mtl4CommandBufferMetadata* metadata, GpuStage after, GpuStageFlags* before, GpuHazardFlags* hazards);
 void mtl4AddBarrierFor(Mtl4CommandBufferMetadata* metadata, GpuStage after, GpuStageFlags before, GpuHazardFlags hazards);
 
-GpuResult* mtl4CopyRenderPassDesc(Mtl4CommandBufferMetadata* metadata, const GpuRenderPassDesc* desc, GpuResult* result);
+GpuRenderPassDesc* mtl4CopyRenderPassDesc(Mtl4CommandBufferMetadata* metadata, const GpuRenderPassDesc* desc, GpuResult* result);
 
 Mtl4CommandBufferMetadata* mtl4AcquireCommandBufferMetadataFrom(Mtl4CommandBuffer handle);
 
