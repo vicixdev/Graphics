@@ -7,6 +7,7 @@
 #include <lib/common/condition.h>
 #include <lib/common/mutex.h>
 #include <lib/common/rw_mutex.h>
+#include <lib/common/semaphore.h>
 
 typedef struct MutexCounterContext {
 	CmnMutex mutex;
@@ -269,4 +270,88 @@ void checkRWMutexWriteExclusion(Test* test) {
 	TEST_ASSERT(test, !readerHeldContext.didWriteLock);
 
 	cmnRWMutexUnlockRead(&rwMutex);
+}
+
+typedef struct SemaphoreConcurrencyContext {
+	CmnSemaphore semaphore;
+	CmnMutex stateMutex;
+	uint32_t activeCount;
+	uint32_t maxActiveCount;
+	uint32_t limit;
+	uint32_t iterations;
+	bool violation;
+} SemaphoreConcurrencyContext;
+
+static void* semaphoreWorkerThreadProc(void* ptr) {
+	SemaphoreConcurrencyContext* context = (SemaphoreConcurrencyContext*)ptr;
+
+	for (uint32_t i = 0; i < context->iterations; i++) {
+		cmnSemaphoreWait(&context->semaphore);
+
+		cmnMutexLock(&context->stateMutex);
+		context->activeCount++;
+		if (context->activeCount > context->limit) {
+			context->violation = true;
+		}
+		if (context->activeCount > context->maxActiveCount) {
+			context->maxActiveCount = context->activeCount;
+		}
+		cmnMutexUnlock(&context->stateMutex);
+
+		for (size_t spin = 0; spin < 256; spin++) {
+			__builtin_arm_isb(0xF);
+		}
+		sched_yield();
+
+		cmnMutexLock(&context->stateMutex);
+		context->activeCount--;
+		cmnMutexUnlock(&context->stateMutex);
+
+		cmnSemaphorePost(&context->semaphore);
+	}
+
+	return nullptr;
+}
+
+void checkSemaphoreAllowsMaximumConcurrentAcquisitions(Test* test) {
+	const size_t threadCount = 8;
+	const uint32_t limit = 3;
+	const uint32_t iterations = 2000;
+
+	SemaphoreConcurrencyContext context = {};
+	cmnCreateSemaphore(&context.semaphore, limit);
+	context.limit = limit;
+	context.iterations = iterations;
+
+	pthread_t workers[threadCount];
+	for (size_t i = 0; i < threadCount; i++) {
+		int createResult = pthread_create(&workers[i], nullptr, semaphoreWorkerThreadProc, &context);
+		TEST_ASSERT(test, createResult == 0);
+	}
+
+	for (size_t i = 0; i < threadCount; i++) {
+		int joinResult = pthread_join(workers[i], nullptr);
+		TEST_ASSERT(test, joinResult == 0);
+	}
+
+	TEST_ASSERT(test, !context.violation);
+	TEST_ASSERT(test, context.maxActiveCount == limit);
+}
+
+void checkSemaphoreTryWaitFailsWhenCountIsZero(Test* test) {
+	CmnSemaphore semaphore = {};
+	cmnCreateSemaphore(&semaphore, 1);
+
+	bool didAcquire = cmnSemaphoreTryWait(&semaphore);
+	TEST_ASSERT(test, didAcquire);
+
+	bool didAcquireAgain = cmnSemaphoreTryWait(&semaphore);
+	TEST_ASSERT(test, !didAcquireAgain);
+
+	cmnSemaphorePost(&semaphore);
+
+	didAcquireAgain = cmnSemaphoreTryWait(&semaphore);
+	TEST_ASSERT(test, didAcquireAgain);
+
+	cmnSemaphorePost(&semaphore);
 }

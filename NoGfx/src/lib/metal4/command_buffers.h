@@ -8,7 +8,8 @@
 #include <lib/metal4/queue.h>
 #include <lib/metal4/depthstencilstates.h>
 #include <lib/metal4/blend_states.h>
-#include <lib/metal4/encoding_context.h>
+#include <lib/metal4/command.h>
+#include <lib/metal4/command_emitters.h>
 
 #include <gpu/gpu.h>
 #include <Metal/Metal.h>
@@ -54,16 +55,6 @@ typedef struct Mtl4CommandBufferMetadata {
 typedef struct Mtl4CommandBufferStorage {
 	CmnPage				pages			[MTL4_MAX_PARALLEL_COMMANDBUFFER_ENCODINGS];
 	CmnArena			arenas			[MTL4_MAX_PARALLEL_COMMANDBUFFER_ENCODINGS];
-
-	Mtl4CommandEmissionContext	emissionContexts	[MTL4_MAX_PARALLEL_COMMANDBUFFER_ENCODINGS];
-	// Atomic
-	size_t				emissionContextIdx;
-
-	id<MTLBuffer>			zeroBuffer;
-	Mtl4Pipeline			prepareMultiDrawIcbsPipeline;
-
-	// Atomic
-	uint64_t submitCount;
 
 	CmnStaticHandleMap<Mtl4CommandBufferMetadata, MTL4_MAX_PARALLEL_COMMANDBUFFER_ENCODINGS> commandBuffers;
 	CmnRWMutex	commandBuffersMutex;
@@ -116,9 +107,6 @@ void mtl4AddBarrierFor(Mtl4CommandBufferMetadata* metadata, GpuStage after, GpuS
 GpuRenderPassDesc* mtl4CopyRenderPassDesc(Mtl4CommandBufferMetadata* metadata, const GpuRenderPassDesc* desc, GpuResult* result);
 
 Mtl4CommandBufferMetadata* mtl4AcquireCommandBufferMetadataFrom(Mtl4CommandBuffer handle);
-
-Mtl4CommandEmissionContext* mtl4AcquireEmissionContext(void);
-void mtl4ReleaseEmissionContext(Mtl4CommandEmissionContext* context);
 
 inline Mtl4CommandBuffer mtl4GpuCommandBufferToHandle(GpuCommandBuffer commandBuffer) {
 	return *(Mtl4CommandBuffer*)&commandBuffer;

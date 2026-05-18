@@ -1,5 +1,4 @@
 #include "command_buffers.h"
-#include "lib/metal4/encoding_context.h"
 
 #include <lib/common/heap_allocator.h>
 #include <lib/common/atomic.h>
@@ -9,6 +8,7 @@
 #include <lib/metal4/allocation.h>
 #include <lib/metal4/events.h>
 #include <lib/metal4/semaphores.h>
+#include <lib/metal4/command_emission.h>
 #include <lib/metal4/shader/prep_multidrawindirect.h>
 
 Mtl4CommandBufferStorage gMtl4CommandBufferStorage;
@@ -16,52 +16,10 @@ Mtl4CommandBufferStorage gMtl4CommandBufferStorage;
 void mtl4InitCommandBufferStorage(GpuResult* result) {
 
 	CmnResult localResult;
-	GpuResult localGpuResult;
 
 	gMtl4CommandBufferStorage = {};
 
 	cmnCreateStaticHandleMap(&gMtl4CommandBufferStorage.commandBuffers, {});
-
-	gMtl4CommandBufferStorage.zeroBuffer = [gMtl4Context.device
-		newBufferWithLength:1024
-		options:MTLResourceStorageModePrivate
-	];
-	mtl4AddAllocationToResidencySet(gMtl4CommandBufferStorage.zeroBuffer);
-	for (size_t i = 0; i < MTL4_MAX_PARALLEL_COMMANDBUFFER_ENCODINGS; i++) {
-		gMtl4CommandBufferStorage.emissionContexts[i].zeroBuffer = gMtl4CommandBufferStorage.zeroBuffer;
-	}
-
-	for (size_t i = 0; i < MTL4_MAX_PARALLEL_COMMANDBUFFER_ENCODINGS; i++) {
-		gMtl4CommandBufferStorage.emissionContexts[i].bumpBuffer = [gMtl4Context.device
-			newBufferWithLength:1024*1024
-			options:MTLResourceStorageModeShared | MTLResourceCPUCacheModeWriteCombined
-		];
-		gMtl4CommandBufferStorage.emissionContexts[i].bumpBufferSize = 1024 * 1024;
-		mtl4AddAllocationToResidencySet(gMtl4CommandBufferStorage.emissionContexts[i].bumpBuffer);
-	}
-
-	for (size_t i = 0; i < MTL4_MAX_PARALLEL_COMMANDBUFFER_ENCODINGS; i++) {
-		MTLIndirectCommandBufferDescriptor* icbDesc = [[MTLIndirectCommandBufferDescriptor new] autorelease];
-		icbDesc.commandTypes = MTLIndirectCommandTypeDrawIndexed;
-		icbDesc.inheritCullMode = YES;
-		icbDesc.inheritDepthStencilState = YES;
-		icbDesc.inheritDepthBias = YES;
-		icbDesc.inheritDepthClipMode = YES;
-		icbDesc.inheritPipelineState = YES;
-		icbDesc.inheritFrontFacingWinding = YES;
-		icbDesc.inheritTriangleFillMode = YES;
-		icbDesc.inheritBuffers = NO;
-		icbDesc.maxVertexBufferBindCount = 1;
-		icbDesc.maxFragmentBufferBindCount = 2;
-
-		gMtl4CommandBufferStorage.emissionContexts[i].icbBuffer = [gMtl4Context.device
-			newIndirectCommandBufferWithDescriptor:icbDesc
-			maxCommandCount:8 * 1024
-			options:MTLResourceStorageModePrivate
-		];
-		gMtl4CommandBufferStorage.emissionContexts[i].icbBufferLength = 8 * 1024;
-		mtl4AddAllocationToResidencySet(gMtl4CommandBufferStorage.emissionContexts[i].icbBuffer);
-	}
 
 	for (size_t i = 0; i < MTL4_MAX_PARALLEL_COMMANDBUFFER_ENCODINGS; i++) {
 		gMtl4CommandBufferStorage.pages[i] = cmnCreatePage(1024 * 1024 * 32, CMN_PAGE_READABLE | CMN_PAGE_WRITABLE, &localResult);
@@ -73,104 +31,6 @@ void mtl4InitCommandBufferStorage(GpuResult* result) {
 		gMtl4CommandBufferStorage.arenas[i] = cmnPageToArena(gMtl4CommandBufferStorage.pages[i]);
 	}
 
-	for (size_t i = 0; i < MTL4_MAX_PARALLEL_COMMANDBUFFER_ENCODINGS; i++) {
-		id<MTL4CommandAllocator> commandAllocator = [gMtl4Context.device newCommandAllocator];
-		if (commandAllocator == nil) {
-			CMN_SET_RESULT(result, GPU_OUT_OF_GPU_MEMORY);
-			return;
-		}
-
-		gMtl4CommandBufferStorage.emissionContexts[i].commandAllocator = commandAllocator;
-	}
-
-	for (size_t i = 0; i < MTL4_MAX_PARALLEL_COMMANDBUFFER_ENCODINGS; i++) {
-		id<MTL4CommandQueue> queue = [gMtl4Context.device newMTL4CommandQueue];
-		if (queue == nil) {
-			CMN_SET_RESULT(result, GPU_OUT_OF_GPU_MEMORY);
-			return;
-		}
-
-		gMtl4CommandBufferStorage.emissionContexts[i].queue = queue;
-		[queue addResidencySet:gMtl4AllocationStorage.residencySet];
-		[queue addResidencySet:gMtl4EventStorage.uploadBufferResidencySet];
-	}
-
-	for (size_t i = 0; i < MTL4_MAX_PARALLEL_COMMANDBUFFER_ENCODINGS; i++) {
-		id<MTLSharedEvent> event = [gMtl4Context.device newSharedEvent];
-		if (event == nil) {
-			CMN_SET_RESULT(result, GPU_OUT_OF_GPU_MEMORY);
-			return;
-		}
-
-		gMtl4CommandBufferStorage.emissionContexts[i].submitEvent = event;
-	}
-
-	MTL4ArgumentTableDescriptor* computeArgumentTableDesc = [[MTL4ArgumentTableDescriptor new] autorelease];
-	computeArgumentTableDesc.maxBufferBindCount = 1;
-	computeArgumentTableDesc.maxSamplerStateBindCount = 0;
-	computeArgumentTableDesc.maxTextureBindCount = 0;
-
-	MTL4ArgumentTableDescriptor* vertexArgumentTableDesc = [[MTL4ArgumentTableDescriptor new] autorelease];
-	vertexArgumentTableDesc.maxBufferBindCount = 1;
-	vertexArgumentTableDesc.maxSamplerStateBindCount = 0;
-	vertexArgumentTableDesc.maxTextureBindCount = 0;
-
-	MTL4ArgumentTableDescriptor* fragmentArgumentTableDesc = [[MTL4ArgumentTableDescriptor new] autorelease];
-	fragmentArgumentTableDesc.maxBufferBindCount = 2;
-	fragmentArgumentTableDesc.maxSamplerStateBindCount = 0;
-	fragmentArgumentTableDesc.maxTextureBindCount = 0;
-
-	for (size_t i = 0; i < MTL4_MAX_PARALLEL_COMMANDBUFFER_ENCODINGS; i++) {
-		id<MTL4ArgumentTable> argumentTable = [gMtl4Context.device
-			newArgumentTableWithDescriptor:computeArgumentTableDesc
-			error:nullptr];
-		if (argumentTable == nil) {
-			CMN_SET_RESULT(result, GPU_OUT_OF_CPU_MEMORY);
-			return;
-		}
-
-		gMtl4CommandBufferStorage.emissionContexts[i].computeArgumentTable = argumentTable;
-	}
-
-	for (size_t i = 0; i < MTL4_MAX_PARALLEL_COMMANDBUFFER_ENCODINGS; i++) {
-		id<MTL4ArgumentTable> argumentTable = [gMtl4Context.device
-			newArgumentTableWithDescriptor:vertexArgumentTableDesc
-			error:nullptr];
-		if (argumentTable == nil) {
-			CMN_SET_RESULT(result, GPU_OUT_OF_CPU_MEMORY);
-			return;
-		}
-
-		gMtl4CommandBufferStorage.emissionContexts[i].vertexArgumentTable = argumentTable;
-	}
-
-
-	for (size_t i = 0; i < MTL4_MAX_PARALLEL_COMMANDBUFFER_ENCODINGS; i++) {
-		id<MTL4ArgumentTable> argumentTable = [gMtl4Context.device
-			newArgumentTableWithDescriptor:fragmentArgumentTableDesc
-			error:nullptr];
-		if (argumentTable == nil) {
-			CMN_SET_RESULT(result, GPU_OUT_OF_CPU_MEMORY);
-			return;
-		}
-
-		gMtl4CommandBufferStorage.emissionContexts[i].fragmentArgumentTable = argumentTable;
-	}
-
-	uint32_t prepareMultiDrawIcbsGroupSize[] = { 128, 1, 1 };
-	GpuPipeline prepareMultiDrawIcbs = gpuCreateComputePipeline(
-		gMtl4PrepareMultidrawIndirectIcbsBytecode,
-		sizeof(gMtl4PrepareMultidrawIndirectIcbsBytecode),
-		NULL, 0,
-		prepareMultiDrawIcbsGroupSize,
-		&localGpuResult);
-	assert(localGpuResult == GPU_SUCCESS && "Builtin pipeline creation failed. This shouldn't happen.");
-
-	gMtl4CommandBufferStorage.prepareMultiDrawIcbsPipeline = mtl4GpuPipelineToHandle(prepareMultiDrawIcbs);
-	for (size_t i = 0; i < MTL4_MAX_PARALLEL_COMMANDBUFFER_ENCODINGS; i++) {
-		gMtl4CommandBufferStorage.emissionContexts[i].prepareMultidrawIcbsPipeline = gMtl4CommandBufferStorage.prepareMultiDrawIcbsPipeline;
-	}
-
 
 	CMN_SET_RESULT(result, GPU_SUCCESS);
 	return;
@@ -178,21 +38,7 @@ void mtl4InitCommandBufferStorage(GpuResult* result) {
 
 void mtl4FiniCommandBufferStorage(void) {
 	for (size_t i = 0; i < MTL4_MAX_PARALLEL_COMMANDBUFFER_ENCODINGS; i++) {
-		if (gMtl4CommandBufferStorage.emissionContexts[i].commandAllocator != nil) {
-			[gMtl4CommandBufferStorage.emissionContexts[i].commandAllocator release];
-		}
-	}
-
-	for (size_t i = 0; i < MTL4_MAX_PARALLEL_COMMANDBUFFER_ENCODINGS; i++) {
-		if (gMtl4CommandBufferStorage.emissionContexts[i].queue != nil) {
-			[gMtl4CommandBufferStorage.emissionContexts[i].queue release];
-		}
-	}
-
-	for (size_t i = 0; i < MTL4_MAX_PARALLEL_COMMANDBUFFER_ENCODINGS; i++) {
-		if (gMtl4CommandBufferStorage.emissionContexts[i].computeArgumentTable != nil) {
-			[gMtl4CommandBufferStorage.emissionContexts[i].computeArgumentTable release];
-		}
+		cmnDestroyPage(gMtl4CommandBufferStorage.pages[i]);
 	}
 
 	gMtl4CommandBufferStorage = {};
@@ -263,8 +109,8 @@ void mtl4Submit(Mtl4CommandEmissionContext* emitContext, GpuCommandBuffer* comma
 void mtl4Submit(GpuQueue queue, GpuCommandBuffer* commandBuffers, size_t commandBufferCount, GpuResult* result) {
 	(void)queue;
 
-	Mtl4CommandEmissionContext* emitContext = mtl4AcquireEmissionContext();
-	defer (mtl4ReleaseEmissionContext(emitContext));
+	Mtl4CommandEmissionContext* emitContext = mtl4AcquireCommandEmissionContext({});
+	defer (mtl4ReleaseCommandEmissionContext(emitContext));
 
 	mtl4Submit(emitContext, commandBuffers, commandBufferCount, result);
 }
@@ -279,11 +125,11 @@ void mtl4SubmitWithSignal(
 ) {
 	(void)queue;
 
-	Mtl4CommandEmissionContext* emitContext = mtl4AcquireEmissionContext();
-	defer (mtl4ReleaseEmissionContext(emitContext));
+	Mtl4CommandEmissionContext* emitContext = mtl4AcquireCommandEmissionContext({});
+	defer (mtl4ReleaseCommandEmissionContext(emitContext));
 
 	mtl4Submit(emitContext, commandBuffers, commandBufferCount, result);
-	mtl4EmitSignal(emitContext, mtl4GpuSemaphoreToHandle(semaphore), value, result);
+	mtl4EmitSemaphoreSignal(emitContext, mtl4GpuSemaphoreToHandle(semaphore), value, result);
 }
 
 void mtl4MemCpy(GpuCommandBuffer cb, void* destGpu, void* srcGpu, size_t size, GpuResult* result) {
@@ -671,6 +517,7 @@ void mtl4DrawIndexedInstancedIndirect(GpuCommandBuffer cb, void* vertexDataGpu, 
 	}
 
 	metadata->activeRenderPass.renderPass.requiresPreparation = true;
+	metadata->activeRenderPass.renderPass.containsIndirectDraw = true;
 
 	CMN_SET_RESULT(result, GPU_SUCCESS);
 }
@@ -770,24 +617,6 @@ GpuRenderPassDesc* mtl4CopyRenderPassDesc(Mtl4CommandBufferMetadata* metadata, c
 
 	CMN_SET_RESULT(result, GPU_SUCCESS);
 	return descCopy;
-}
-
-Mtl4CommandEmissionContext* mtl4AcquireEmissionContext(void) {
-	size_t index;
-	for (;;) {
-		index = cmnAtomicAdd(&gMtl4CommandBufferStorage.emissionContextIdx, (size_t)1);
-
-		if (!cmnAtomicExchange(&gMtl4CommandBufferStorage.emissionContexts[index].inUse, true)) {
-			break;
-		}
-	}
-
-	[gMtl4AllocationStorage.residencySet commit];
-	return &gMtl4CommandBufferStorage.emissionContexts[index];
-}
-
-void mtl4ReleaseEmissionContext(Mtl4CommandEmissionContext* context) {
-	cmnAtomicStore(&context->inUse, false);
 }
 
 Mtl4CommandBufferMetadata* mtl4AcquireCommandBufferMetadataFrom(Mtl4CommandBuffer handle) {

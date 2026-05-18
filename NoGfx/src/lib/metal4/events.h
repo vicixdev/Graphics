@@ -16,11 +16,6 @@ typedef struct Mtl4EventStorage {
 	CmnPage		page;
 	CmnArena	arena;
 
-	id<MTLResidencySet> uploadBufferResidencySet;
-	id<MTLBuffer>	signaledValuesUploadBuffer;
-	uint64_t	uploadBufferSize;
-	uint64_t	uploadBufferUsed;
-
 	CmnPointerMap	<id<MTLEvent>>	lookup;
 	CmnStorageSync	sync;
 } Mtl4EventStorage;
@@ -32,21 +27,6 @@ void mtl4FiniEventStorage(void);
 id<MTLEvent> mtl4AcquireEventOf(void* gpuPtr);
 id<MTLEvent> mtl4AcquireOrCreateEventFor(void* gpuPtr, GpuResult* result);
 void mtl4ReleaseEvent(void);
-
-void mtl4SignalEvent(
-	Mtl4CommandBufferMetadata* commandBuffer,
-	GpuStageFlags before,
-	void* gpuPtr,
-	uint64_t value,
-	GpuResult* result
-);
-void mtl4WaitEvent(
-	Mtl4CommandBufferMetadata* commandBuffer,
-	GpuStageFlags after,
-	void* gpuPtr,
-	uint64_t value,
-	GpuResult* result
-);
 
 #endif // MTL4_FENCES_H
 

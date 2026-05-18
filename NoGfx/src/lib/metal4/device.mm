@@ -4,6 +4,7 @@
 #include <lib/metal4/allocation.h>
 #include <lib/metal4/pipelines.h>
 #include <lib/metal4/command_buffers.h>
+#include <lib/metal4/command_emitters.h>
 #include <lib/metal4/events.h>
 
 static const GpuSignal gMtl4SupportedSignals[] = { GPU_SIGNAL_ATOMIC_MAX };
@@ -134,6 +135,17 @@ void mtl4SelectDevice(GpuDeviceId deviceId, GpuResult* result) {
 
 	mtl4InitCommandBufferStorage(&localResult);
 	if (localResult != GPU_SUCCESS) {
+		mtl4FiniPipelineStorage();
+		mtl4FiniEventStorage();
+		mtl4FiniCommandBufferStorage();
+
+		CMN_SET_RESULT(result, localResult);
+		return;
+	}
+
+	mtl4InitCommandEmissionStorage(&localResult);
+	if (localResult != GPU_SUCCESS) {
+		mtl4FiniCommandBufferStorage();
 		mtl4FiniPipelineStorage();
 		mtl4FiniEventStorage();
 		mtl4FiniCommandBufferStorage();

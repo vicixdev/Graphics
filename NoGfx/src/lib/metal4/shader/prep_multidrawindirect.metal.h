@@ -1,0 +1,6 @@
+#ifndef Gmtl4preparemultidrawindirecticbsbytecode_H
+#define Gmtl4preparemultidrawindirecticbsbytecode_H
+
+extern unsigned char gMtl4PrepareMultidrawIndirectIcbsBytecode[17158];
+
+#endif

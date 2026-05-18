@@ -26,34 +26,12 @@ void mtl4InitEventStorage(GpuResult* result) {
 		return;
 	}
 
-	gMtl4EventStorage.signaledValuesUploadBuffer = [
-		gMtl4Context.device
-		newBufferWithLength:1024*1024
-		options:MTLResourceStorageModeShared | MTLResourceCPUCacheModeWriteCombined];
-	gMtl4EventStorage.uploadBufferSize = 1024 * 1024;
-	gMtl4EventStorage.uploadBufferUsed = 0;
-
-	MTLResidencySetDescriptor* residencySetDescriptor = [MTLResidencySetDescriptor new];
-	defer ([residencySetDescriptor release]);
-	residencySetDescriptor.initialCapacity = 1;
-	residencySetDescriptor.label = @"Signaled values upload residency set";
-
-	gMtl4EventStorage.uploadBufferResidencySet = [gMtl4Context.device newResidencySetWithDescriptor:residencySetDescriptor error:nil];
-	[gMtl4EventStorage.uploadBufferResidencySet addAllocation:gMtl4EventStorage.signaledValuesUploadBuffer];
-	[gMtl4EventStorage.uploadBufferResidencySet commit];
-
-	if (gMtl4EventStorage.signaledValuesUploadBuffer == nil) {
-		CMN_SET_RESULT(result, GPU_OUT_OF_GPU_MEMORY);
-		return;
-	}
-
 	CMN_SET_RESULT(result, GPU_SUCCESS);
 	return;
 }
 
 void mtl4FiniEventStorage() {
 	cmnDestroyPage(gMtl4EventStorage.page);
-	[gMtl4EventStorage.signaledValuesUploadBuffer release];
 
 	gMtl4EventStorage = {};
 }
@@ -113,98 +91,5 @@ id<MTLEvent> mtl4AcquireOrCreateEventFor(void* gpuPtr, GpuResult* result) {
 
 void mtl4ReleaseEvent(void) {
 	cmnStorageSyncReleaseResource(&gMtl4EventStorage.sync);
-}
-
-size_t mtl4UploadFenceValue(uint64_t value) {
-	uintptr_t values = (uintptr_t)[gMtl4EventStorage.signaledValuesUploadBuffer contents];
-
-	size_t valueOffset;
-	for (;;) {
-		valueOffset = cmnAtomicLoad(&gMtl4EventStorage.uploadBufferUsed);
-		if (valueOffset >= gMtl4EventStorage.uploadBufferSize) {
-			valueOffset = 0;
-		}
-
-		if (cmnAtomicCompareExchangeStrong<uint64_t>(
-			&gMtl4EventStorage.uploadBufferUsed,
-			valueOffset,
-			valueOffset + sizeof(uint64_t)
-		)) {
-			break;
-		}
-	}
-
-	uint64_t* valuePtr = (uint64_t*)(values + valueOffset);
-	*valuePtr = value;
-
-	return valueOffset;
-}
-
-void mtl4SignalEvent(
-	Mtl4CommandBufferMetadata* commandBuffer,
-	GpuStageFlags after,
-	void* gpuPtr,
-	uint64_t value,
-	GpuResult* result
-) {
-	(void)after;
-
-	GpuResult localResult;
-
-	id<MTLEvent> event = mtl4AcquireOrCreateEventFor(gpuPtr, &localResult);
-	if (localResult != GPU_SUCCESS) {
-		CMN_SET_RESULT(result, localResult);
-		return;
-	}
-	defer (mtl4ReleaseEvent());
-
-	Mtl4AllocationMetadata* allocation = mtl4AcquireAllocationMetadataFromGpuPtr(gpuPtr, true);
-	if (allocation == nullptr) {
-		CMN_SET_RESULT(result, GPU_NO_SUCH_ALLOCATION_FOUND);
-		return;
-	}
-	defer (mtl4ReleaseAllocationMetadata());
-
-	uintptr_t gpuPtrOffsetFromBase = mtl4GpuPtrOffsetFromBase(allocation, gpuPtr);
-
-	size_t fenceUploadValueOffset = mtl4UploadFenceValue(value);
-
-	// mtl4FlushCommandEncoderOf(commandBuffer);
-	// mtl4EnsureValidComputeEndoderFor(commandBuffer);
-	// [commandBuffer->computeEncoder barrierAfterQueueStages:MTLStageAll beforeStages:MTLStageBlit visibilityOptions:MTL4VisibilityOptionDevice | MTL4VisibilityOptionResourceAlias];
-	// [commandBuffer->computeEncoder
-	// 	copyFromBuffer:gMtl4EventStorage.signaledValuesUploadBuffer
-	// 	sourceOffset:fenceUploadValueOffset
-	// 	toBuffer:allocation->buffer
-	// 	destinationOffset:gpuPtrOffsetFromBase
-	// 	size:sizeof(uint64_t)];
-
-	// mtl4FlushCommandBuffer(commandBuffer);
-	// [commandBuffer->queue signalEvent:event value:value];
-}
-
-
-void mtl4WaitEvent(
-	Mtl4CommandBufferMetadata* commandBuffer,
-	GpuStageFlags before,
-	void* gpuPtr,
-	uint64_t value,
-	GpuResult* result
-) {
-	(void)before;
-
-	GpuResult localResult;
-
-	id<MTLEvent> event = mtl4AcquireOrCreateEventFor(gpuPtr, &localResult);
-	if (localResult != GPU_SUCCESS) {
-		CMN_SET_RESULT(result, localResult);
-		return;
-	}
-	defer (mtl4ReleaseEvent());
-
-	// mtl4FlushCommandBuffer(commandBuffer);
-	// [commandBuffer->queue waitForEvent:event value:value];
-
-	CMN_SET_RESULT(result, GPU_SUCCESS);
 }
 

@@ -115,8 +115,10 @@ typedef struct Mtl4RenderCommand {
 
 typedef struct Mtl4CommandRenderPass {
 	const GpuRenderPassDesc*	desc;
+
 	bool				requiresPreparation;
 	bool				containsMultiDraw;
+	bool				containsIndirectDraw;
 
 	CmnChain<Mtl4RenderCommand>	commands;
 } Mtl4CommandRenderPass;

@@ -5,6 +5,8 @@
 
 #include <Metal/Metal.h>
 
+typedef size_t Mtl4Queue;
+
 #define MTL4_QUEUE_HANDLE (GpuQueue)(0x0BADCAFE0BADCAFE)
 
 GpuQueue mtl4CreateQueue(GpuResult* result);

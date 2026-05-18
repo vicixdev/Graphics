@@ -91,6 +91,9 @@ TestRecord gCommonTests[] = {
 	{ "Check RW mutex allows concurrent readers",			checkRWMutexAllowsConcurrentReaders		},
 	{ "Check RW mutex write exclusion",				checkRWMutexWriteExclusion			},
 
+	{ "Check semaphore allows maximum concurrent acquisitions",	checkSemaphoreAllowsMaximumConcurrentAcquisitions	},
+	{ "Check semaphore try-wait fails when count is zero",	checkSemaphoreTryWaitFailsWhenCountIsZero	},
+
 	{ "Check storage sync acquire/release for valid handles", 	checkStorageSyncAcquireAndReleaseValidHandle	},
 	{ "Check storage sync invalid handles do not increment users", 	checkStorageSyncInvalidHandleDoesNotIncrementUsers	},
 	{ "Check storage sync deletion waits for active users", 	checkStorageSyncDeletionWaitsForActiveUsers	},

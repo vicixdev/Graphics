@@ -16,16 +16,14 @@ struct PrepareIcbArgs {
 	device void*				vertexData;
 	device GpuMultiDrawIndirectArgs*	args;
 	device uint*				argCount;
+	device MTLIndirectCommandBufferExecutionRange*	icbRange;
 
-	device MTLIndirectCommandBufferExecutionRange*	outRange;
-
-	size_t					icbStartOffset;
 	size_t					vertexStride;
 	size_t					fragmentStride;
 
 	primitive_type				primitive;
 };
-static_assert(sizeof(PrepareIcbArgs) == 88, "Unexpected size");
+static_assert(sizeof(PrepareIcbArgs) == 80, "Unexpected size");
 
 [[host_name("main")]]
 kernel void prepareMultiDrawIndirectIcbs(
@@ -35,13 +33,10 @@ kernel void prepareMultiDrawIndirectIcbs(
 	
 	device PrepareIcbArgs* args = (device PrepareIcbArgs*)argsVoid;
 	
-	args->outRange->location = args->icbStartOffset;
-	args->outRange->length = *args->argCount;
-
-	render_command command(args->commandBuffer, threadId + args->icbStartOffset);
+	render_command command(args->commandBuffer, threadId + args->icbRange->location);
 	command.reset();
 
-	if (threadId >= *args->argCount) {
+	if (threadId >= args->icbRange->length) {
 		return;
 	}
 	

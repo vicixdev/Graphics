@@ -13,6 +13,7 @@
 #include <lib/common/mutex.cpp>
 #include <lib/common/condition.cpp>
 #include <lib/common/rw_mutex.cpp>
+#include <lib/common/semaphore.cpp>
 #include <lib/common/storage_sync.cpp>
 #include <lib/common/memory.cpp>
 #include <lib/common/heap_allocator.cpp>
@@ -34,8 +35,11 @@
 #include <lib/metal4/semaphores.mm>
 #include <lib/metal4/depthstencilstates.mm>
 #include <lib/metal4/blend_states.mm>
+#include <lib/metal4/command_emitters.mm>
+#include <lib/metal4/command_emission.mm>
 #include <lib/metal4/validation.mm>
 #include <lib/metal4/deletion_manager.cpp>
 
-#include <lib/metal4/shader/prep_multidrawindirect.cpp>
+#include <lib/metal4/shader/prep_multidrawindirect.metal.cpp>
+#include <lib/metal4/shader/acquire_icb_range.metal.cpp>
 

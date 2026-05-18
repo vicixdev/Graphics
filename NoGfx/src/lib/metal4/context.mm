@@ -82,6 +82,8 @@ void mtl4Deinit(void) {
 	mtl4DeleteScheduledTextures();
 	mtl4DeleteScheduledAllocations();
 
+	mtl4FiniCommandEmissionStorage();
+	mtl4FiniCommandBufferStorage();
 	mtl4FiniSemaphoreStorage();
 	mtl4FiniCommandBufferStorage();
 	mtl4FiniPipelineStorage();

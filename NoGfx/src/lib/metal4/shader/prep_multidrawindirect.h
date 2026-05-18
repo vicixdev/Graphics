@@ -1,9 +1,9 @@
-#ifndef Gmtl4preparemultidrawindirecticbsbytecode_H
-#define Gmtl4preparemultidrawindirecticbsbytecode_H
+#ifndef MTL4_PREPAREMULTIDRAWINDIRECT_H
+#define MTL4_PREPAREMULTIDRAWINDIRECT_H
 
 #include <Metal/Metal.h>
 
-extern unsigned char gMtl4PrepareMultidrawIndirectIcbsBytecode[17254];
+#include <lib/metal4/shader/prep_multidrawindirect.metal.h>
 
 typedef struct Mtl4PrepareMultidrawIndirectIcbsArgs {
 	MTLResourceID				commandBuffer;
@@ -14,14 +14,13 @@ typedef struct Mtl4PrepareMultidrawIndirectIcbsArgs {
 	uintptr_t				args;
 	uintptr_t				argCount;
 
-	uintptr_t				outRange;
-
-	size_t					icbStartOffset;
+	// GpuPtr to MTLIndirectCommandBufferExecutionRange
+	uintptr_t				icbRange;
 	size_t					vertexStride;
 	size_t					fragmentStride;
 
 	MTLPrimitiveType			primitive;
 } Mtl4PrepareMultidrawIndirectIcbsArgs;
-static_assert(sizeof(Mtl4PrepareMultidrawIndirectIcbsArgs) == 88, "Unexpected size");
+static_assert(sizeof(Mtl4PrepareMultidrawIndirectIcbsArgs) == 80, "Unexpected size");
 
 #endif
