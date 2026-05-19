@@ -3,7 +3,37 @@
 
 #include <lib/metal4/command.h>
 #include <lib/metal4/semaphores.h>
-#include <lib/metal4/command_emitters.h>
+
+struct Mtl4QueueMetadata;
+
+typedef struct Mtl4CommandEmissionContext {
+	// Atomic
+	bool				inUse;
+
+	id<MTL4CommandQueue>		queue;
+	id<MTL4CommandAllocator>	commandAllocator;
+
+	id<MTL4CommandBuffer>		commandBuffer;
+	id<MTL4ComputeCommandEncoder>	computeEncoder;
+	id<MTL4RenderCommandEncoder>	renderEncoder;
+
+	id<MTL4ArgumentTable>		computeArgumentTable;
+	id<MTL4ArgumentTable>		vertexArgumentTable;
+	id<MTL4ArgumentTable>		fragmentArgumentTable;
+
+	id<MTLIndirectCommandBuffer>	icbBuffer;
+	// Contains an uint.
+	id<MTLBuffer>			firstFreeIcbIndex;
+
+	id<MTLBuffer>			bumpBuffer;
+	size_t				bumpBufferOffset;
+	size_t				bumpBufferSize;
+
+	MTLStages			computeUsedStages;
+} Mtl4CommandEmissionContext;
+
+void mtl4InitCommandEmissionContext(Mtl4CommandEmissionContext* context, Mtl4QueueMetadata* queue, GpuResult* result);
+void mtl4FiniCommandEmissionContext(Mtl4CommandEmissionContext* context);
 
 MTLStages mtl4GpuToMtlStage(GpuStageFlags stage);
 MTL4VisibilityOptions mtl4GpuHazardsToMtlVisibilityOptions(GpuHazardFlags hazards);

@@ -4,7 +4,6 @@
 #include <lib/metal4/allocation.h>
 #include <lib/metal4/pipelines.h>
 #include <lib/metal4/command_buffers.h>
-#include <lib/metal4/command_emitters.h>
 #include <lib/metal4/events.h>
 
 static const GpuSignal gMtl4SupportedSignals[] = { GPU_SIGNAL_ATOMIC_MAX };
@@ -104,19 +103,24 @@ void mtl4EnumerateDevices(GpuDeviceInfo** devices, size_t* devices_count, GpuRes
 }
 
 void mtl4SelectDevice(GpuDeviceId deviceId, GpuResult* result) {
-	// This is a non-owning pointer. Ownership is held by availableDevices.devices.
-	gMtl4Context.device = gMtl4Context.availableDevices.devices[deviceId];
-	gMtl4Context.selectedDeviceId = deviceId;
 
 	GpuResult localResult;
 
-	MTLResidencySetDescriptor* residencySetDescriptor = [MTLResidencySetDescriptor new];
-	defer ([residencySetDescriptor release]);
-
-	gMtl4Context.residencySet = [gMtl4Context.device
-		newResidencySetWithDescriptor:residencySetDescriptor error:nil];
+	mtl4PrepareContextWithDevice(deviceId, &localResult);
+	if (localResult != GPU_SUCCESS) {
+		CMN_SET_RESULT(result, localResult);
+		return;
+	}
 
 	mtl4InitPipelineStorage(&localResult);
+	if (localResult != GPU_SUCCESS) {
+		mtl4FiniPipelineStorage();
+
+		CMN_SET_RESULT(result, localResult);
+		return;
+	}
+
+	mtl4PrepareBuiltinPipelines(&localResult);
 	if (localResult != GPU_SUCCESS) {
 		mtl4FiniPipelineStorage();
 
@@ -135,17 +139,6 @@ void mtl4SelectDevice(GpuDeviceId deviceId, GpuResult* result) {
 
 	mtl4InitCommandBufferStorage(&localResult);
 	if (localResult != GPU_SUCCESS) {
-		mtl4FiniPipelineStorage();
-		mtl4FiniEventStorage();
-		mtl4FiniCommandBufferStorage();
-
-		CMN_SET_RESULT(result, localResult);
-		return;
-	}
-
-	mtl4InitCommandEmissionStorage(&localResult);
-	if (localResult != GPU_SUCCESS) {
-		mtl4FiniCommandBufferStorage();
 		mtl4FiniPipelineStorage();
 		mtl4FiniEventStorage();
 		mtl4FiniCommandBufferStorage();

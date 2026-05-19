@@ -30,6 +30,6 @@ void kernel acquireIcbRange(
 	*args->firstFreeIdx = newStart;
 
 	args->outRange->location = start;
-	args->outRange->length = *args->requiredLength;
+	args->outRange->length = requiredLength;
 }
 

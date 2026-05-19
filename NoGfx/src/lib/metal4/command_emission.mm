@@ -5,8 +5,139 @@
 #include <lib/metal4/textures.h>
 #include <lib/metal4/events.h>
 #include <lib/metal4/tables.h>
+#include <lib/metal4/queue.h>
 #include <lib/metal4/shader/acquire_icb_range.h>
 #include <lib/metal4/shader/prep_multidrawindirect.h>
+
+void mtl4InitCommandEmissionContext(Mtl4CommandEmissionContext* context, Mtl4QueueMetadata* queue, GpuResult* result) {
+	context->bumpBuffer = [gMtl4Context.device
+		newBufferWithLength:1024*1024
+		options:MTLResourceStorageModeShared | MTLResourceCPUCacheModeWriteCombined
+	];
+	if (context->bumpBuffer == nil) {
+		CMN_SET_RESULT(result, GPU_OUT_OF_GPU_MEMORY);
+		return;
+	}
+	context->bumpBufferSize = 1024 * 1024;
+	mtl4AddAllocationToResidencySet(context->bumpBuffer);
+
+
+	context->commandAllocator = [gMtl4Context.device newCommandAllocator];
+	if (context->commandAllocator == nil) {
+		CMN_SET_RESULT(result, GPU_OUT_OF_GPU_MEMORY);
+		return;
+	}
+
+
+	MTL4ArgumentTableDescriptor* computeArgumentTableDesc = [[MTL4ArgumentTableDescriptor new] autorelease];
+	computeArgumentTableDesc.maxBufferBindCount = 1;
+	computeArgumentTableDesc.maxSamplerStateBindCount = 0;
+	computeArgumentTableDesc.maxTextureBindCount = 0;
+
+	MTL4ArgumentTableDescriptor* vertexArgumentTableDesc = [[MTL4ArgumentTableDescriptor new] autorelease];
+	vertexArgumentTableDesc.maxBufferBindCount = 1;
+	vertexArgumentTableDesc.maxSamplerStateBindCount = 0;
+	vertexArgumentTableDesc.maxTextureBindCount = 0;
+
+	MTL4ArgumentTableDescriptor* fragmentArgumentTableDesc = [[MTL4ArgumentTableDescriptor new] autorelease];
+	fragmentArgumentTableDesc.maxBufferBindCount = 2;
+	fragmentArgumentTableDesc.maxSamplerStateBindCount = 0;
+	fragmentArgumentTableDesc.maxTextureBindCount = 0;
+
+	context->computeArgumentTable = [gMtl4Context.device
+		newArgumentTableWithDescriptor:computeArgumentTableDesc
+		error:nullptr];
+	if (context->computeArgumentTable == nil) {
+		CMN_SET_RESULT(result, GPU_OUT_OF_CPU_MEMORY);
+		return;
+	}
+
+	context->vertexArgumentTable = [gMtl4Context.device
+		newArgumentTableWithDescriptor:vertexArgumentTableDesc
+		error:nullptr];
+	if (context->vertexArgumentTable == nil) {
+		CMN_SET_RESULT(result, GPU_OUT_OF_CPU_MEMORY);
+		return;
+	}
+
+	context->fragmentArgumentTable = [gMtl4Context.device
+		newArgumentTableWithDescriptor:fragmentArgumentTableDesc
+		error:nullptr];
+	if (context->fragmentArgumentTable == nil) {
+		CMN_SET_RESULT(result, GPU_OUT_OF_CPU_MEMORY);
+		return;
+	}
+
+
+	MTLIndirectCommandBufferDescriptor* icbDesc = [[MTLIndirectCommandBufferDescriptor new] autorelease];
+	icbDesc.commandTypes = MTLIndirectCommandTypeDrawIndexed;
+	icbDesc.inheritCullMode = YES;
+	icbDesc.inheritDepthStencilState = YES;
+	icbDesc.inheritDepthBias = YES;
+	icbDesc.inheritDepthClipMode = YES;
+	icbDesc.inheritPipelineState = YES;
+	icbDesc.inheritFrontFacingWinding = YES;
+	icbDesc.inheritTriangleFillMode = YES;
+	icbDesc.inheritBuffers = NO;
+	icbDesc.maxVertexBufferBindCount = 1;
+	icbDesc.maxFragmentBufferBindCount = 2;
+
+	context->icbBuffer = [gMtl4Context.device
+		newIndirectCommandBufferWithDescriptor:icbDesc
+		maxCommandCount:MTL4_MAX_MULTIDRAW_ARG_COUNT * MTL4_MAX_MULTIDRAW_CALLS
+		options:MTLResourceStorageModePrivate];
+	if (context->icbBuffer == nil) {
+		CMN_SET_RESULT(result, GPU_OUT_OF_GPU_MEMORY);
+		return;
+	}
+	mtl4AddAllocationToResidencySet(context->icbBuffer);
+
+	context->firstFreeIcbIndex = [gMtl4Context.device
+		newBufferWithLength:sizeof(uint32_t)
+		options:MTLResourceStorageModePrivate];
+	if (context->firstFreeIcbIndex == nil) {
+		CMN_SET_RESULT(result, GPU_OUT_OF_GPU_MEMORY);
+		return;
+	}
+	mtl4AddAllocationToResidencySet(context->firstFreeIcbIndex);
+
+
+	context->queue = queue->queue;
+
+
+	CMN_SET_RESULT(result, GPU_SUCCESS);
+}
+
+void mtl4FiniCommandEmissionContext(Mtl4CommandEmissionContext* context) {
+	if (context->bumpBuffer != nil) {
+		[context->bumpBuffer release];
+	}
+
+	if (context->commandAllocator != nil) {
+		[context->commandAllocator release];
+	}
+
+	if (context->computeArgumentTable != nil) {
+		[context->computeArgumentTable release];
+	}
+
+	if (context->vertexArgumentTable != nil) {
+		[context->vertexArgumentTable release];
+	}
+
+	if (context->fragmentArgumentTable != nil) {
+		[context->fragmentArgumentTable release];
+	}
+
+	if (context->firstFreeIcbIndex != nil) {
+		[context->firstFreeIcbIndex release];
+	}
+
+	if (context->icbBuffer != nil) {
+		[context->icbBuffer release];
+	}
+
+}
 
 void mtl4FlushComputeEncoder(Mtl4CommandEmissionContext* context) {
 	if (context->computeEncoder != nil) {
@@ -25,7 +156,7 @@ void mtl4FlushCommandBuffer(Mtl4CommandEmissionContext* context) {
 	[context->commandBuffer endCommandBuffer];
 
 	[gMtl4Context.residencySet commit];
-	[context->queueMetadata->queue commit:&context->commandBuffer count:1];
+	[context->queue commit:&context->commandBuffer count:1];
 
 	[context->commandBuffer release];
 	context->commandBuffer = nil;
@@ -398,7 +529,7 @@ void mtl4EmitSignal(Mtl4CommandEmissionContext* context, Mtl4Command* command, G
 		size:sizeof(uint64_t)];
 	mtl4FlushCommandBuffer(context);
 
-	[context->queueMetadata->queue signalEvent:event value:signal->value];
+	[context->queue signalEvent:event value:signal->value];
 }
 
 void mtl4EmitWait(Mtl4CommandEmissionContext* context, Mtl4Command* command, GpuResult* result) {
@@ -423,7 +554,7 @@ void mtl4EmitWait(Mtl4CommandEmissionContext* context, Mtl4Command* command, Gpu
 	defer (mtl4ReleaseAllocationMetadata());
 
 	mtl4FlushCommandBuffer(context);
-	[context->queueMetadata->queue waitForEvent:event value:wait->value];
+	[context->queue waitForEvent:event value:wait->value];
 }
 
 void mtl4EmitDrawIndirectPrep(Mtl4CommandEmissionContext* context, Mtl4RenderCommand* command, GpuResult* result) {
@@ -456,7 +587,7 @@ void mtl4EmitDrawIndirectPrep(Mtl4CommandEmissionContext* context, Mtl4RenderCom
 		destinationOffset:argsOffset
 		size:sizeof(GpuIndirectDrawArgs)];
 	[context->computeEncoder
-		copyFromBuffer:gMtl4CommandEmissionStorage.zeroBuffer
+		copyFromBuffer:gMtl4Context.zeroBuffer
 		sourceOffset:0
 		toBuffer:context->bumpBuffer
 		destinationOffset:argsOffset + sizeof(GpuIndirectDrawArgs)
@@ -471,11 +602,11 @@ void mtl4EmitMultiDrawIndirectPrep(Mtl4CommandEmissionContext* context, Mtl4Rend
 	Mtl4CommandMultiDrawIndirect* draw = &command->multiDrawIndirect;
 
 
-	Mtl4PipelineMetadata* acquireIcbRangePipelineMetadata = mtl4AcquirePipelineMetadataFrom(gMtl4CommandEmissionStorage.acquireIcbRange);
+	Mtl4PipelineMetadata* acquireIcbRangePipelineMetadata = mtl4AcquirePipelineMetadataFrom(gMtl4Context.acquireIcbRange);
 	assert(acquireIcbRangePipelineMetadata != nullptr && "The builtin pipeline could not be found.");
 	defer (mtl4ReleasePipelineMetadata());
 
-	Mtl4PipelineMetadata* prepareIcbsPipelineMetadata = mtl4AcquirePipelineMetadataFrom(gMtl4CommandEmissionStorage.prepareMultidrawIcbs);
+	Mtl4PipelineMetadata* prepareIcbsPipelineMetadata = mtl4AcquirePipelineMetadataFrom(gMtl4Context.prepareMultidrawIcbs);
 	assert(prepareIcbsPipelineMetadata != nullptr && "The builtin pipeline could not be found.");
 	defer (mtl4ReleasePipelineMetadata());
 
@@ -830,7 +961,7 @@ void mtl4EmitSemaphoreSignal(
 		return;
 	}
 
-	[context->queueMetadata->queue
+	[context->queue
 		signalEvent:semaphoreMetadata->event
 		value:value];
 }

@@ -113,7 +113,7 @@ void mtl4Submit(GpuQueue queue, GpuCommandBuffer* commandBuffers, size_t command
 	CmnScopedNSAutoreleasePool pool;
 
 	Mtl4CommandEmissionContext* emitContext = mtl4AcquireCommandEmissionContext({});
-	defer (mtl4ReleaseCommandEmissionContext(emitContext));
+	defer (mtl4ReleaseCommandEmissionContext(queue));
 
 	mtl4Submit(emitContext, commandBuffers, commandBufferCount, result);
 }
@@ -130,8 +130,8 @@ void mtl4SubmitWithSignal(
 
 	CmnScopedNSAutoreleasePool pool;
 
-	Mtl4CommandEmissionContext* emitContext = mtl4AcquireCommandEmissionContext({});
-	defer (mtl4ReleaseCommandEmissionContext(emitContext));
+	Mtl4CommandEmissionContext* emitContext = mtl4AcquireCommandEmissionContext(queue);
+	defer (mtl4ReleaseCommandEmissionContext(queue));
 
 	mtl4Submit(emitContext, commandBuffers, commandBufferCount, result);
 	mtl4EmitSemaphoreSignal(emitContext, mtl4GpuSemaphoreToHandle(semaphore), value, result);

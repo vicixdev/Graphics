@@ -6,15 +6,17 @@
 #include <lib/common/page.h>
 #include <lib/common/exponential_array.h>
 #include <lib/common/rw_mutex.h>
+#include <lib/metal4/command_emission.h>
 
 #include <Metal/Metal.h>
 
 typedef size_t Mtl4Queue;
 
 typedef struct Mtl4QueueMetadata {
-	id<MTL4CommandQueue>	queue;
+	id<MTL4CommandQueue>		queue;
 
-	CmnMutex		encodingMutex;
+	Mtl4CommandEmissionContext	emissionContext;
+	CmnMutex			emissionMutex;
 } Mtl4QueueMetadata;
 
 typedef struct Mtl4QueueStorage {
@@ -34,12 +36,15 @@ GpuQueue mtl4CreateQueue(GpuResult* result);
 
 Mtl4QueueMetadata* mtl4QueueMetadataOf(Mtl4Queue queue);
 
+Mtl4CommandEmissionContext* mtl4AcquireCommandEmissionContext(Mtl4Queue queue);
+void mtl4ReleaseCommandEmissionContext(Mtl4Queue queue);
+
 inline void mtl4LockQueue(Mtl4QueueMetadata* metadata) {
-	cmnMutexLock(&metadata->encodingMutex);
+	cmnMutexLock(&metadata->emissionMutex);
 }
 
 inline void mtl4UnlockQueue(Mtl4QueueMetadata* metadata) {
-	cmnMutexUnlock(&metadata->encodingMutex);
+	cmnMutexUnlock(&metadata->emissionMutex);
 }
 
 inline Mtl4Queue mtl4GpuQueueToHandle(GpuQueue queue) {

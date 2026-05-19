@@ -11,12 +11,22 @@
 #include <lib/metal4/command_buffers.h>
 #include <lib/metal4/semaphores.h>
 #include <lib/metal4/deletion_manager.h>
+#include <lib/metal4/shader/acquire_icb_range.h>
+#include <lib/metal4/shader/prep_multidrawindirect.h>
 
 // 128 KB
 #define MTL4_GLOBAL_MEMORY 128 * 1024
 
 // 1 MB
 #define MTL4_TEMP_MEMORY 1 * 1024 * 1024
+
+static const uint32_t MTL4_ACQUIRE_ICB_RANGE_CONSTANTS[1] = {
+	/*icbBufferSize=*/	MTL4_MAX_MULTIDRAW_ARG_COUNT * MTL4_MAX_MULTIDRAW_CALLS,
+};
+static uint32_t MTL4_ACQUIRE_ICB_RANGE_GROUP_SIZE[3] = { 1, 1, 1 };
+
+static uint32_t MTL4_PREPARE_MULTIDRAW_ICBS_GROUP_SIZE[3] = { 64, 1, 1 };
+
 
 Mtl4Context gMtl4Context;
 
@@ -93,11 +103,13 @@ void mtl4Deinit(void) {
 		mtl4StopTracing();
 	}
 
+	mtl4FreePipeline(mtl4HandleToGpuPipeline(gMtl4Context.acquireIcbRange));
+	mtl4FreePipeline(mtl4HandleToGpuPipeline(gMtl4Context.prepareMultidrawIcbs));
+
 	mtl4DeleteScheduledPipelines();
 	mtl4DeleteScheduledTextures();
 	mtl4DeleteScheduledAllocations();
 
-	mtl4FiniCommandEmissionStorage();
 	mtl4FiniCommandBufferStorage();
 	mtl4FiniSemaphoreStorage();
 	mtl4FiniQueueStorage();
@@ -106,6 +118,10 @@ void mtl4Deinit(void) {
 	mtl4FiniTextureStorage();
 	mtl4FiniAllocationStorage();
 	mtl4FiniDeletionManager();
+
+	if (gMtl4Context.zeroBuffer != nil) {
+		[gMtl4Context.zeroBuffer release];
+	}
 
 	if (gMtl4Context.residencySet != nil) {
 		[gMtl4Context.residencySet release];
@@ -142,5 +158,59 @@ void mtl4RemoveAllocationToResidencySet(id<MTLAllocation> allocation) {
 
 	CmnScopedMutex guard(&gMtl4Context.residencySetMutex);
 	[gMtl4Context.residencySet removeAllocation:allocation];
+}
+
+void mtl4PrepareContextWithDevice(GpuDeviceId deviceId, GpuResult* result) {
+
+	// This is a non-owning pointer. Ownership is held by availableDevices.devices.
+	gMtl4Context.device = gMtl4Context.availableDevices.devices[deviceId];
+	gMtl4Context.selectedDeviceId = deviceId;
+
+
+	MTLResidencySetDescriptor* residencySetDescriptor = [MTLResidencySetDescriptor new];
+	defer ([residencySetDescriptor release]);
+
+	gMtl4Context.residencySet = [gMtl4Context.device
+		newResidencySetWithDescriptor:residencySetDescriptor error:nil];
+	if (gMtl4Context.residencySet == nil) {
+		CMN_SET_RESULT(result, GPU_OUT_OF_GPU_MEMORY);
+		return;
+	}
+
+
+	gMtl4Context.zeroBuffer = [gMtl4Context.device
+		newBufferWithLength:1024
+		options:MTLResourceStorageModePrivate
+	];
+	if (gMtl4Context.zeroBuffer == nil) {
+		CMN_SET_RESULT(result, GPU_OUT_OF_GPU_MEMORY);
+		return;
+	}
+	gMtl4Context.zeroBuffer.label = @"gMtl4Context.zeroBuffer";
+	mtl4AddAllocationToResidencySet(gMtl4Context.zeroBuffer);
+
+	CMN_SET_RESULT(result, GPU_SUCCESS);
+}
+
+void mtl4PrepareBuiltinPipelines(GpuResult* result) {
+	GpuResult localResult;
+
+	GpuPipeline acquireIcbRange = gpuCreateComputePipeline(
+		gMtl4AcquireIcbRangeBytecode, sizeof(gMtl4AcquireIcbRangeBytecode),
+		MTL4_ACQUIRE_ICB_RANGE_CONSTANTS, sizeof(MTL4_ACQUIRE_ICB_RANGE_CONSTANTS),
+		MTL4_ACQUIRE_ICB_RANGE_GROUP_SIZE,
+		&localResult);
+	assert(localResult == GPU_SUCCESS && "The builtin `acquireIcbRange` pipeline failed to compile.");
+	gMtl4Context.acquireIcbRange = mtl4GpuPipelineToHandle(acquireIcbRange);
+
+	GpuPipeline prepareMultiDrawIcbs = gpuCreateComputePipeline(
+		gMtl4PrepareMultidrawIndirectIcbsBytecode, sizeof(gMtl4PrepareMultidrawIndirectIcbsBytecode),
+		NULL, 0,
+		MTL4_PREPARE_MULTIDRAW_ICBS_GROUP_SIZE,
+		&localResult);
+	assert(localResult == GPU_SUCCESS && "The builtin `prepareMultidrawIndirectIcbs` pipeline failed to compile.");
+	gMtl4Context.prepareMultidrawIcbs = mtl4GpuPipelineToHandle(prepareMultiDrawIcbs);
+
+	CMN_SET_RESULT(result, GPU_SUCCESS);
 }
 

@@ -43,6 +43,7 @@ void mtl4FiniQueueStorage(void) {
 
 GpuQueue mtl4CreateQueue(GpuResult* result) {
 	CmnResult localResult;
+	GpuResult localGpuResult;
 
 	Mtl4QueueMetadata metadata = {};
 
@@ -54,14 +55,25 @@ GpuQueue mtl4CreateQueue(GpuResult* result) {
 
 	CmnScopedWriteRWMutex guard(&gMtl4QueueStorage.mutex);
 
+	mtl4InitCommandEmissionContext(&metadata.emissionContext, &metadata, &localGpuResult);
+	if (localGpuResult != GPU_SUCCESS) {
+		[metadata.queue release];
+
+		CMN_SET_RESULT(result, localGpuResult);
+		return {};
+	}
+
 	Mtl4Queue handle = gMtl4QueueStorage.queues.length;
 	cmnAppend(&gMtl4QueueStorage.queues, metadata, &localResult);
 	if (localResult != CMN_SUCCESS) {
 		[metadata.queue release];
+		mtl4FiniCommandEmissionContext(&metadata.emissionContext);
 
 		CMN_SET_RESULT(result, GPU_OUT_OF_CPU_MEMORY);
 		return {};
 	}
+
+	[metadata.queue addResidencySet:gMtl4Context.residencySet];
 
 	CMN_SET_RESULT(result, GPU_SUCCESS);
 	return mtl4HandleToGpuQueue(handle);
@@ -75,5 +87,25 @@ Mtl4QueueMetadata* mtl4QueueMetadataOf(Mtl4Queue handle) {
 	}
 
 	return &gMtl4QueueStorage.queues[handle];
+}
+
+Mtl4CommandEmissionContext* mtl4AcquireCommandEmissionContext(Mtl4Queue queue) {
+	Mtl4QueueMetadata* queueMetadata = mtl4QueueMetadataOf(queue);
+	if (queueMetadata == nullptr) {
+		return nullptr;
+	}
+
+	mtl4LockQueue(queueMetadata);
+
+	return &queueMetadata->emissionContext;
+}
+
+void mtl4ReleaseCommandEmissionContext(Mtl4Queue queue) {
+	Mtl4QueueMetadata* queueMetadata = mtl4QueueMetadataOf(queue);
+	if (queueMetadata == nullptr) {
+		return;
+	}
+
+	mtl4UnlockQueue(queueMetadata);
 }
 

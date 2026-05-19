@@ -9,7 +9,6 @@
 #include <lib/metal4/depthstencilstates.h>
 #include <lib/metal4/blend_states.h>
 #include <lib/metal4/command.h>
-#include <lib/metal4/command_emitters.h>
 
 #include <gpu/gpu.h>
 #include <Metal/Metal.h>
