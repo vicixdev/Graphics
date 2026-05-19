@@ -113,7 +113,7 @@ void mtl4SelectDevice(GpuDeviceId deviceId, GpuResult* result) {
 	MTLResidencySetDescriptor* residencySetDescriptor = [MTLResidencySetDescriptor new];
 	defer ([residencySetDescriptor release]);
 
-	gMtl4AllocationStorage.residencySet = [gMtl4Context.device
+	gMtl4Context.residencySet = [gMtl4Context.device
 		newResidencySetWithDescriptor:residencySetDescriptor error:nil];
 
 	mtl4InitPipelineStorage(&localResult);

@@ -92,8 +92,6 @@ void mtl4FiniAllocationStorage(void) {
 	cmnDestroyPointerMap(&gMtl4AllocationStorage.cpuDirectLookup);
 	cmnDestroyPointerMap(&gMtl4AllocationStorage.gpuDirectLookup);
 
-	[gMtl4AllocationStorage.residencySet release];
-	
 	gMtl4AllocationStorage = {};
 }
 
@@ -461,21 +459,3 @@ void mtl4DestroyAllocation(Mtl4AllocationHandle handle) {
 	cmnRemove(&gMtl4AllocationStorage.allocations, handle);
 }
 
-void mtl4AddAllocationToResidencySet(id<MTLAllocation> allocation) {
-	if (allocation == nil) {
-		return;
-	}
-
-	CmnScopedMutex guard(&gMtl4AllocationStorage.residencySetMutex);
-	[gMtl4AllocationStorage.residencySet addAllocation:allocation];
-}
-
-void mtl4RemoveAllocationToResidencySet(id<MTLAllocation> allocation) {
-	if (allocation == nil) {
-		return;
-	}
-
-	CmnScopedMutex guard(&gMtl4AllocationStorage.residencySetMutex);
-	[gMtl4AllocationStorage.residencySet removeAllocation:allocation];
-	
-}

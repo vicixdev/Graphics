@@ -53,9 +53,6 @@ typedef struct Mtl4AllocationStorage {
 	CmnPool		miscPool;
 	CmnPool		nodesPool;
 
-	id<MTLResidencySet>	residencySet;
-	CmnMutex	residencySetMutex;
-
 	CmnPointerMap	<Mtl4AllocationHandle>				gpuDirectLookup;
 	CmnBTree	<Mtl4AddressRange, Mtl4AllocationHandle>	gpuRangeLookup;
 	CmnPointerMap	<Mtl4AllocationHandle>				cpuDirectLookup;
@@ -113,9 +110,6 @@ bool mtl4IsAllocationScheduledForDeletion(Mtl4AllocationMetadata* metadata);
 
 // NOTE: Requires a deletion lock in gMtl4AllocationStorage.sync
 void mtl4DestroyAllocation(Mtl4AllocationHandle handle);
-
-void mtl4AddAllocationToResidencySet(id<MTLAllocation> allocation);
-void mtl4RemoveAllocationToResidencySet(id<MTLAllocation> allocation);
 
 // NOTE: This is an HACK, since eq and cmp are not symmetrical. This works because the implementation of BTree always
 //	compares keys and values with the same order: keys on the right, values on the left.

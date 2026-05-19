@@ -8,6 +8,9 @@
 #include <lib/metal4/depthstencilstates.h>
 #include <lib/metal4/blend_states.h>
 
+#define MTL4_MAX_MULTIDRAW_ARG_COUNT 512
+#define MTL4_MAX_MULTIDRAW_CALLS 64
+
 typedef enum Mtl4CommandType {
 	MTL4_CMD_COPY_BUFFER_TO_BUFFER = 0,
 	MTL4_CMD_COPY_BUFFER_TO_TEXTURE,

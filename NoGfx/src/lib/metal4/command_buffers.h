@@ -48,6 +48,8 @@ typedef struct Mtl4CommandBufferMetadata {
 
 	bool				isEncodingRenderpass;
 	Mtl4Command			activeRenderPass;
+
+	size_t				multiDrawCommandsInPass;
 	
 	CmnExponentialArray	<Mtl4Command, 5>	commands;
 } Mtl4CommandBufferMetadata;

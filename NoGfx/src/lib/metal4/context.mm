@@ -89,6 +89,10 @@ on_error_cleanup:
 void mtl4Deinit(void) {
 	CmnScopedNSAutoreleasePool pool;
 
+	if (gMtl4Context.isCurrentlyTracing) {
+		mtl4StopTracing();
+	}
+
 	mtl4DeleteScheduledPipelines();
 	mtl4DeleteScheduledTextures();
 	mtl4DeleteScheduledAllocations();
@@ -103,8 +107,8 @@ void mtl4Deinit(void) {
 	mtl4FiniAllocationStorage();
 	mtl4FiniDeletionManager();
 
-	if (gMtl4Context.isCurrentlyTracing) {
-		mtl4StopTracing();
+	if (gMtl4Context.residencySet != nil) {
+		[gMtl4Context.residencySet release];
 	}
 
 	if (gMtl4Context.availableDevices.devices != nullptr) {
@@ -120,5 +124,23 @@ void mtl4Deinit(void) {
 	free(gMtl4Context.tempBackingMemory);
 
 	gMtl4Context = {};
+}
+
+void mtl4AddAllocationToResidencySet(id<MTLAllocation> allocation) {
+	if (allocation == nil) {
+		return;
+	}
+
+	CmnScopedMutex guard(&gMtl4Context.residencySetMutex);
+	[gMtl4Context.residencySet addAllocation:allocation];
+}
+
+void mtl4RemoveAllocationToResidencySet(id<MTLAllocation> allocation) {
+	if (allocation == nil) {
+		return;
+	}
+
+	CmnScopedMutex guard(&gMtl4Context.residencySetMutex);
+	[gMtl4Context.residencySet removeAllocation:allocation];
 }
 

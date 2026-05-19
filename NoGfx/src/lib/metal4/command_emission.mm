@@ -24,7 +24,7 @@ void mtl4FlushCommandBuffer(Mtl4CommandEmissionContext* context) {
 	mtl4FlushComputeEncoder(context);
 	[context->commandBuffer endCommandBuffer];
 
-	[gMtl4AllocationStorage.residencySet commit];
+	[gMtl4Context.residencySet commit];
 	[context->queueMetadata->queue commit:&context->commandBuffer count:1];
 
 	[context->commandBuffer release];
@@ -497,7 +497,7 @@ void mtl4EmitMultiDrawIndirectPrep(Mtl4CommandEmissionContext* context, Mtl4Rend
 
 
 	acquireIcbRangeArgs->outRange = [context->bumpBuffer gpuAddress] + rangeOffset;
-	acquireIcbRangeArgs->firstFreeIdx = [gMtl4CommandEmissionStorage.firstFreeIcbIndex gpuAddress];
+	acquireIcbRangeArgs->firstFreeIdx = [context->firstFreeIcbIndex gpuAddress];
 	acquireIcbRangeArgs->requiredLength = (uintptr_t)draw->indirectDrawCount;
 	[context->computeArgumentTable setAddress:[context->bumpBuffer gpuAddress] + acquireIcbRangeArgsOffset atIndex:0];
 
@@ -507,7 +507,7 @@ void mtl4EmitMultiDrawIndirectPrep(Mtl4CommandEmissionContext* context, Mtl4Rend
 	[context->computeEncoder dispatchThreads:MTLSizeMake(1, 1, 1) threadsPerThreadgroup:MTLSizeMake(1, 1, 1)];
 
 
-	prepareIcbsArgs->commandBuffer = [gMtl4CommandEmissionStorage.icbBuffer gpuResourceID];
+	prepareIcbsArgs->commandBuffer = [context->icbBuffer gpuResourceID];
 	prepareIcbsArgs->icbRange = [context->bumpBuffer gpuAddress] + rangeOffset;
 	prepareIcbsArgs->primitive = gMtl4GpuTopologyToMtlPrimitive[drawPipelineMetadata->graphics.desc.topology];
 	prepareIcbsArgs->textureHeap = (uintptr_t)command->textureHeapPtr;
@@ -524,7 +524,7 @@ void mtl4EmitMultiDrawIndirectPrep(Mtl4CommandEmissionContext* context, Mtl4Rend
 	[context->computeEncoder barrierAfterQueueStages:MTLStageDispatch beforeStages:MTLStageDispatch visibilityOptions:MTL4VisibilityOptionDevice];
 	[context->computeEncoder setComputePipelineState:prepareIcbsPipelineMetadata->compute.pso];
 	[context->computeEncoder setArgumentTable:context->computeArgumentTable];
-	[context->computeEncoder dispatchThreads:MTLSizeMake(16384, 1, 1) threadsPerThreadgroup:MTLSizeMake(256, 1, 1)];
+	[context->computeEncoder dispatchThreads:MTLSizeMake(MTL4_MAX_MULTIDRAW_ARG_COUNT, 1, 1) threadsPerThreadgroup:MTLSizeMake(64, 1, 1)];
 
 	draw->preparedIcbRangeOffset = rangeOffset;
 }
@@ -728,7 +728,7 @@ void mtl4EmitMultiDrawIndirect(Mtl4CommandEmissionContext* context, Mtl4RenderCo
 
 	mtl4EmitDrawSetup(context, command, result);
 	[context->renderEncoder
-		executeCommandsInBuffer:gMtl4CommandEmissionStorage.icbBuffer
+		executeCommandsInBuffer:context->icbBuffer
 		indirectBuffer:[context->bumpBuffer gpuAddress] + draw->preparedIcbRangeOffset];
 
 	CMN_SET_RESULT(result, GPU_SUCCESS);

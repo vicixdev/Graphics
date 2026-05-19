@@ -3,15 +3,16 @@
 #include <lib/metal4/context.h>
 #include <lib/metal4/allocation.h>
 #include <lib/metal4/events.h>
+#include <lib/metal4/command.h>
 #include <lib/metal4/shader/acquire_icb_range.h>
 #include <lib/metal4/shader/prep_multidrawindirect.h>
 
 const uint32_t MTL4_ACQUIRE_ICB_RANGE_CONSTANTS[1] = {
-	/*icbBufferSize=*/	16384,
+	/*icbBufferSize=*/	MTL4_MAX_MULTIDRAW_ARG_COUNT * MTL4_MAX_MULTIDRAW_CALLS,
 };
 uint32_t MTL4_ACQUIRE_ICB_RANGE_GROUP_SIZE[3] = { 1, 1, 1 };
 
-uint32_t MTL4_PREPARE_MULTIDRAW_ICBS_GROUP_SIZE[3] = { 16384, 1, 1 };
+uint32_t MTL4_PREPARE_MULTIDRAW_ICBS_GROUP_SIZE[3] = { 64, 1, 1 };
 
 Mtl4CommandEmissionStorage gMtl4CommandEmissionStorage;
 
@@ -31,41 +32,6 @@ void mtl4InitCommandEmissionStorage(GpuResult* result) {
 	}
 	gMtl4CommandEmissionStorage.zeroBuffer.label = @"gMtl4CommandEmissionStorage.zeroBuffer";
 	mtl4AddAllocationToResidencySet(gMtl4CommandEmissionStorage.zeroBuffer);
-
-
-	MTLIndirectCommandBufferDescriptor* icbDesc = [[MTLIndirectCommandBufferDescriptor new] autorelease];
-	icbDesc.commandTypes = MTLIndirectCommandTypeDrawIndexed;
-	icbDesc.inheritCullMode = YES;
-	icbDesc.inheritDepthStencilState = YES;
-	icbDesc.inheritDepthBias = YES;
-	icbDesc.inheritDepthClipMode = YES;
-	icbDesc.inheritPipelineState = YES;
-	icbDesc.inheritFrontFacingWinding = YES;
-	icbDesc.inheritTriangleFillMode = YES;
-	icbDesc.inheritBuffers = NO;
-	icbDesc.maxVertexBufferBindCount = 1;
-	icbDesc.maxFragmentBufferBindCount = 2;
-
-	gMtl4CommandEmissionStorage.icbBuffer = [gMtl4Context.device
-		newIndirectCommandBufferWithDescriptor:icbDesc
-		maxCommandCount:16384
-		options:MTLResourceStorageModePrivate];
-	if (gMtl4CommandEmissionStorage.icbBuffer == nil) {
-		CMN_SET_RESULT(result, GPU_OUT_OF_GPU_MEMORY);
-		return;
-	}
-	gMtl4CommandEmissionStorage.icbBuffer.label = @"gMtl4CommandEmissionStorage.icbBuffer";
-	mtl4AddAllocationToResidencySet(gMtl4CommandEmissionStorage.icbBuffer);
-
-	gMtl4CommandEmissionStorage.firstFreeIcbIndex = [gMtl4Context.device
-		newBufferWithLength:sizeof(uint32_t)
-		options:MTLResourceStorageModePrivate];
-	if (gMtl4CommandEmissionStorage.firstFreeIcbIndex == nil) {
-		CMN_SET_RESULT(result, GPU_OUT_OF_GPU_MEMORY);
-		return;
-	}
-	gMtl4CommandEmissionStorage.firstFreeIcbIndex.label = @"gMtl4CommandEmissionStorage.firstFreeIcbIndex";
-	mtl4AddAllocationToResidencySet(gMtl4CommandEmissionStorage.firstFreeIcbIndex);
 
 
 	GpuPipeline acquireIcbRange = gpuCreateComputePipeline(
@@ -103,14 +69,6 @@ void mtl4FiniCommandEmissionStorage(void) {
 
 	if (gMtl4CommandEmissionStorage.zeroBuffer != nil) {
 		[gMtl4CommandEmissionStorage.zeroBuffer release];
-	}
-
-	if (gMtl4CommandEmissionStorage.firstFreeIcbIndex != nil) {
-		[gMtl4CommandEmissionStorage.firstFreeIcbIndex release];
-	}
-
-	if (gMtl4CommandEmissionStorage.icbBuffer != nil) {
-		[gMtl4CommandEmissionStorage.icbBuffer release];
 	}
 
 	gpuFreePipeline(mtl4HandleToGpuPipeline(gMtl4CommandEmissionStorage.acquireIcbRange));
@@ -179,6 +137,39 @@ void mtl4InitCommandEmissionContext(Mtl4CommandEmissionContext* context, GpuResu
 	}
 
 
+	MTLIndirectCommandBufferDescriptor* icbDesc = [[MTLIndirectCommandBufferDescriptor new] autorelease];
+	icbDesc.commandTypes = MTLIndirectCommandTypeDrawIndexed;
+	icbDesc.inheritCullMode = YES;
+	icbDesc.inheritDepthStencilState = YES;
+	icbDesc.inheritDepthBias = YES;
+	icbDesc.inheritDepthClipMode = YES;
+	icbDesc.inheritPipelineState = YES;
+	icbDesc.inheritFrontFacingWinding = YES;
+	icbDesc.inheritTriangleFillMode = YES;
+	icbDesc.inheritBuffers = NO;
+	icbDesc.maxVertexBufferBindCount = 1;
+	icbDesc.maxFragmentBufferBindCount = 2;
+
+	context->icbBuffer = [gMtl4Context.device
+		newIndirectCommandBufferWithDescriptor:icbDesc
+		maxCommandCount:MTL4_MAX_MULTIDRAW_ARG_COUNT * MTL4_MAX_MULTIDRAW_CALLS
+		options:MTLResourceStorageModePrivate];
+	if (context->icbBuffer == nil) {
+		CMN_SET_RESULT(result, GPU_OUT_OF_GPU_MEMORY);
+		return;
+	}
+	mtl4AddAllocationToResidencySet(context->icbBuffer);
+
+	context->firstFreeIcbIndex = [gMtl4Context.device
+		newBufferWithLength:sizeof(uint32_t)
+		options:MTLResourceStorageModePrivate];
+	if (context->firstFreeIcbIndex == nil) {
+		CMN_SET_RESULT(result, GPU_OUT_OF_GPU_MEMORY);
+		return;
+	}
+	mtl4AddAllocationToResidencySet(context->firstFreeIcbIndex);
+
+
 	CMN_SET_RESULT(result, GPU_SUCCESS);
 }
 
@@ -202,6 +193,15 @@ void mtl4FiniCommandEmissionContext(Mtl4CommandEmissionContext* context) {
 	if (context->fragmentArgumentTable != nil) {
 		[context->fragmentArgumentTable release];
 	}
+
+	if (context->firstFreeIcbIndex != nil) {
+		[context->firstFreeIcbIndex release];
+	}
+
+	if (context->icbBuffer != nil) {
+		[context->icbBuffer release];
+	}
+
 }
 
 Mtl4CommandEmissionContext* mtl4AcquireCommandEmissionContext(Mtl4Queue queue) {
@@ -225,7 +225,7 @@ Mtl4CommandEmissionContext* mtl4AcquireCommandEmissionContext(Mtl4Queue queue) {
 	Mtl4CommandEmissionContext* context =  &gMtl4CommandEmissionStorage.contexts[index];
 
 	context->queueMetadata = queueMetadata;
-	[context->queueMetadata->queue addResidencySet:gMtl4AllocationStorage.residencySet];
+	[context->queueMetadata->queue addResidencySet:gMtl4Context.residencySet];
 
 	return context;
 }
@@ -236,5 +236,4 @@ void mtl4ReleaseCommandEmissionContext(Mtl4CommandEmissionContext* context) {
 	cmnSemaphorePost(&gMtl4CommandEmissionStorage.contextsSemaphore);
 	mtl4UnlockQueue(context->queueMetadata);
 }
-
 

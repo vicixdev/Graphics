@@ -22,6 +22,10 @@ typedef struct Mtl4CommandEmissionContext {
 	id<MTL4ArgumentTable>		vertexArgumentTable;
 	id<MTL4ArgumentTable>		fragmentArgumentTable;
 
+	id<MTLIndirectCommandBuffer>	icbBuffer;
+	// Contains an uint.
+	id<MTLBuffer>			firstFreeIcbIndex;
+
 	id<MTLBuffer>			bumpBuffer;
 	size_t				bumpBufferOffset;
 	size_t				bumpBufferSize;
@@ -36,12 +40,7 @@ typedef struct Mtl4CommandEmissionStorage {
 	// NOTE: Allows at max MTL4_MAX_COMMAND_EMITTER context users.
 	CmnSemaphore			contextsSemaphore;
 
-
 	id<MTLBuffer>			zeroBuffer;
-
-	id<MTLIndirectCommandBuffer>	icbBuffer;
-	// Contains an atomic_uint.
-	id<MTLBuffer>			firstFreeIcbIndex;
 
 	// Instance of shader/acquire_icb_range.metal.
 	Mtl4Pipeline acquireIcbRange;

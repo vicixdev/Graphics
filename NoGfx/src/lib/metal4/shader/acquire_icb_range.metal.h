@@ -1,6 +1,6 @@
 #ifndef Gmtl4acquireicbrangebytecode_H
 #define Gmtl4acquireicbrangebytecode_H
 
-extern unsigned char gMtl4AcquireIcbRangeBytecode[18401];
+extern unsigned char gMtl4AcquireIcbRangeBytecode[17201];
 
 #endif

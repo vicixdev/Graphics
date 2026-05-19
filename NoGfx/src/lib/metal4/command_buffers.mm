@@ -440,6 +440,7 @@ void mtl4BeginRenderPass(GpuCommandBuffer cb, const GpuRenderPassDesc* desc, Gpu
 		&metadata->activeRenderPass.renderBarrier.fragment.hazards);
 
 	metadata->isEncodingRenderpass = true;
+	metadata->multiDrawCommandsInPass = 0;
 }
 
 void mtl4EndRenderPass(GpuCommandBuffer cb, GpuResult* result) {
@@ -537,6 +538,11 @@ void mtl4DrawIndexedInstancedIndirectMulti(GpuCommandBuffer cb, void* dataVxGpu,
 		return;
 	}
 
+	if (metadata->multiDrawCommandsInPass >= MTL4_MAX_MULTIDRAW_CALLS) {
+		CMN_SET_RESULT(result, GPU_UNSUPPORTED_OPERATION);
+		return;
+	}
+
 	Mtl4RenderCommand command = {};
 	command.type = MTL4_CMD_MULTIDRAW_INDIRECT;
 	command.pipeline = metadata->pipeline;
@@ -558,6 +564,7 @@ void mtl4DrawIndexedInstancedIndirectMulti(GpuCommandBuffer cb, void* dataVxGpu,
 
 	metadata->activeRenderPass.renderPass.requiresPreparation = true;
 	metadata->activeRenderPass.renderPass.containsMultiDraw = true;
+	metadata->multiDrawCommandsInPass++;
 	
 	CMN_SET_RESULT(result, GPU_SUCCESS);
 }

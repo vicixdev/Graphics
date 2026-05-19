@@ -29,14 +29,17 @@ typedef struct {
 	id<MTLDevice>	device;
 	GpuDeviceId	selectedDeviceId;
 
-	// id<MTLBuffer>	frameArena;
-
-	id<MTL4CommandQueue>	queue;
+	id<MTLResidencySet>	residencySet;
+	CmnMutex	residencySetMutex;
 } Mtl4Context;
 extern Mtl4Context gMtl4Context;
 
 void mtl4Init(const GpuInitDesc* desc, GpuResult* result);
 void mtl4Deinit(void);
+
+void mtl4AddAllocationToResidencySet(id<MTLAllocation> allocation);
+void mtl4RemoveAllocationToResidencySet(id<MTLAllocation> allocation);
+
 
 #endif // GPU_METAL4CONTEXT_H
 

@@ -28,8 +28,6 @@ void mtl4InitQueueStorage(GpuResult* result) {
 
 void mtl4FiniQueueStorage(void) {
 	// TODO: Free all queues
-	cmnDestroyPage(gMtl4QueueStorage.page);
-
 	CmnExponentialArrayIterator<Mtl4QueueMetadata> iter;
 	cmnCreateExponentialArrayIterator(&gMtl4QueueStorage.queues, &iter);
 
@@ -37,6 +35,8 @@ void mtl4FiniQueueStorage(void) {
 	while(cmnIterate(&iter, &queue)) {
 		[queue->queue release];
 	}
+
+	cmnDestroyPage(gMtl4QueueStorage.page);
 
 	gMtl4QueueStorage = {};
 }
