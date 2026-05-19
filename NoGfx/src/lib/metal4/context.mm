@@ -3,6 +3,7 @@
 #include <stdlib.h>
 
 #include <lib/common/type_traits.h>
+#include <lib/common/scoped_nsautoreleasepool.h>
 #include <lib/metal4/device.h>
 #include <lib/metal4/allocation.h>
 #include <lib/metal4/textures.h>
@@ -20,6 +21,8 @@
 Mtl4Context gMtl4Context;
 
 void mtl4Init(const GpuInitDesc* desc, GpuResult* result) {
+	CmnScopedNSAutoreleasePool pool;
+
 	GpuResult localResult;
 
 	gMtl4Context.shouldTrace = desc->tracingEnabled;
@@ -84,6 +87,8 @@ on_error_cleanup:
 }
 
 void mtl4Deinit(void) {
+	CmnScopedNSAutoreleasePool pool;
+
 	mtl4DeleteScheduledPipelines();
 	mtl4DeleteScheduledTextures();
 	mtl4DeleteScheduledAllocations();

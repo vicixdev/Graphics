@@ -93,6 +93,33 @@ template <typename T, size_t N, size_t S> T& cmnLast(CmnExponentialArray<T, N, S
 // - array: Target array.
 template <typename T, size_t N, size_t S> void cmnPop(CmnExponentialArray<T, N, S>* array);
 
+// Iterator over the elements of an exponential array.
+template <typename T, size_t N = 15, size_t S = 5>
+struct CmnExponentialArrayIterator {
+	CmnExponentialArray<T, N, S>* array;
+	size_t currentIndex;
+};
+
+// Initializes an exponential array iterator at the beginning.
+//
+// Inputs:
+// - array: Array to iterate.
+// - iter: Iterator to initialize.
+template <typename T, size_t N, size_t S>
+void cmnCreateExponentialArrayIterator(CmnExponentialArray<T, N, S>* array, CmnExponentialArrayIterator<T, N, S>* iter);
+
+// Advances the iterator and returns the next element.
+//
+// Inputs:
+// - iter: Iterator to advance.
+// - value: Output pointer to the next element.
+//
+// Returns:
+// - true when a next element was found.
+// - false when iteration is complete.
+template <typename T, size_t N, size_t S>
+bool cmnIterate(CmnExponentialArrayIterator<T, N, S>* iter, T** value);
+
 // Maps a linear index to bucket and element indices.
 //
 // Inputs:

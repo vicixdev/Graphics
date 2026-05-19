@@ -41,6 +41,23 @@ void mtl4InitTextureStorage(GpuResult* result) {
 }
 
 void mtl4FiniTextureStorage(void) {
+	CmnHandleMapIterator<Mtl4TextureMetadata> iter;
+	cmnCreateHandleMapIterator(&gMtl4TextureStorage.textures, &iter);
+
+	Mtl4TextureMetadata* texture;
+	while (cmnIterate(&iter, &texture)) {
+		CmnKeyedChainIterator<GpuViewDesc, id<MTLTexture>, 8> viewIter;
+		cmnCreateKeyedChainIterator(&texture->relatedViews, &viewIter);
+
+		GpuViewDesc* desc;
+		id<MTLTexture>* view;
+		while (cmnIterate(&viewIter, &desc, &view)) {
+			[*view release];
+		}
+
+		[texture->texture release];
+	}
+
 	cmnDestroyPage(gMtl4TextureStorage.textureMetadataPage);
 
 	gMtl4TextureStorage = {};

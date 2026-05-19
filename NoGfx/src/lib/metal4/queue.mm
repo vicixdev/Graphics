@@ -30,6 +30,14 @@ void mtl4FiniQueueStorage(void) {
 	// TODO: Free all queues
 	cmnDestroyPage(gMtl4QueueStorage.page);
 
+	CmnExponentialArrayIterator<Mtl4QueueMetadata> iter;
+	cmnCreateExponentialArrayIterator(&gMtl4QueueStorage.queues, &iter);
+
+	Mtl4QueueMetadata* queue;
+	while(cmnIterate(&iter, &queue)) {
+		[queue->queue release];
+	}
+
 	gMtl4QueueStorage = {};
 }
 

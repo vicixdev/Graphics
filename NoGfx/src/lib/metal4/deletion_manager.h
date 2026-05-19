@@ -13,7 +13,7 @@ typedef struct Mtl4DeletionManager {
 	CmnPage		page;
 	CmnArena	arena;
 
-	// Atomic flag preventing concurrent deletion passes.
+	// Atomic
 	uint32_t	isDeleting;
 
 	// Locked by allocationsMutex

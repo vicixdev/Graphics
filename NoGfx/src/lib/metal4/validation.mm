@@ -304,10 +304,13 @@ bool mtl4ValidateGpuTextureRWViewDescriptor(GpuTexture texture, const GpuViewDes
 }
 
 bool mtl4CheckSynchronization(Mtl4CommandBufferMetadata* metadata, GpuStageFlags before, GpuStageFlags after, GpuResult* result) {
-	// if (metadata->renderEncoder != nil && (mtl4IsStageRender(before) || mtl4IsStageRender(after))) {
-		// CMN_SET_RESULT(result, GPU_SYNCHRONIZATION_WHILE_ENCODING_RENDERPASS);
-		// return false;
-	// }
+	(void)before;
+	(void)after;
+
+	if (metadata->isEncodingRenderpass) {
+		CMN_SET_RESULT(result, GPU_SYNCHRONIZATION_WHILE_ENCODING_RENDERPASS);
+		return false;
+	}
 
 	CMN_SET_RESULT(result, GPU_SUCCESS);
 	return true;

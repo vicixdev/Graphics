@@ -137,3 +137,25 @@ void cmnRemove(CmnHandleMap<T>* map, CmnHandle handle) {
 
 	map->firstFree = handle.index;
 }
+
+template <typename T>
+void cmnCreateHandleMapIterator(CmnHandleMap<T>* map, CmnHandleMapIterator<T>* iter) {
+	iter->map = map;
+	iter->currentBucketIndex = 0;
+}
+
+template <typename T>
+bool cmnIterate(CmnHandleMapIterator<T>* iter, T** value) {
+	while (iter->currentBucketIndex < iter->map->buckets.length) {
+		CmnHandleMapBucket<T>& bucket = iter->map->buckets[iter->currentBucketIndex];
+		if (bucket.isInUse) {
+			*value = &bucket.element;
+			iter->currentBucketIndex++;
+			return true;
+		}
+
+		iter->currentBucketIndex++;
+	}
+
+	return false;
+}

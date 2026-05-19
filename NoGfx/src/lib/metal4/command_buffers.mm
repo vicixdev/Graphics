@@ -3,6 +3,7 @@
 #include <lib/common/heap_allocator.h>
 #include <lib/common/atomic.h>
 #include <lib/common/futex.h>
+#include <lib/common/scoped_nsautoreleasepool.h>
 #include <lib/metal4/context.h>
 #include <lib/metal4/tables.h>
 #include <lib/metal4/allocation.h>
@@ -109,6 +110,8 @@ void mtl4Submit(Mtl4CommandEmissionContext* emitContext, GpuCommandBuffer* comma
 void mtl4Submit(GpuQueue queue, GpuCommandBuffer* commandBuffers, size_t commandBufferCount, GpuResult* result) {
 	(void)queue;
 
+	CmnScopedNSAutoreleasePool pool;
+
 	Mtl4CommandEmissionContext* emitContext = mtl4AcquireCommandEmissionContext({});
 	defer (mtl4ReleaseCommandEmissionContext(emitContext));
 
@@ -124,6 +127,8 @@ void mtl4SubmitWithSignal(
 	GpuResult* result
 ) {
 	(void)queue;
+
+	CmnScopedNSAutoreleasePool pool;
 
 	Mtl4CommandEmissionContext* emitContext = mtl4AcquireCommandEmissionContext({});
 	defer (mtl4ReleaseCommandEmissionContext(emitContext));

@@ -76,6 +76,15 @@ void mtl4InitAllocationStorage(GpuResult* result) {
 }
 
 void mtl4FiniAllocationStorage(void) {
+	CmnHandleMapIterator<Mtl4AllocationMetadata> iter;
+	cmnCreateHandleMapIterator(&gMtl4AllocationStorage.allocations, &iter);
+
+	Mtl4AllocationMetadata* allocation;
+	while (cmnIterate(&iter, &allocation)) {
+		[allocation->backing release];
+		[allocation->buffer release];
+	}
+
 	cmnDestroyPage(gMtl4AllocationStorage.miscPoolPage);
 	cmnDestroyPage(gMtl4AllocationStorage.nodesPoolPage);
 	cmnDestroyPage(gMtl4AllocationStorage.arenaPage);

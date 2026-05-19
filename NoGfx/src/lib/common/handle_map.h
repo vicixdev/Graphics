@@ -102,6 +102,35 @@ T& cmnGet(CmnHandleMap<T>* map, CmnHandle handle, bool* wasHandleValid);
 template <typename T>
 void cmnRemove(CmnHandleMap<T>* map, CmnHandle handle);
 
+// Iterator over all live elements in a handle map.
+template <typename T>
+struct CmnHandleMapIterator {
+	// Map being iterated.
+	CmnHandleMap<T>* map;
+	// Current bucket index in the map.
+	uint32_t currentBucketIndex;
+};
+
+// Initializes a handle map iterator at the beginning.
+//
+// Inputs:
+// - map: Map to iterate.
+// - iter: Iterator to initialize.
+template <typename T>
+void cmnCreateHandleMapIterator(CmnHandleMap<T>* map, CmnHandleMapIterator<T>* iter);
+
+// Advances the iterator and returns the next live element.
+//
+// Inputs:
+// - iter: Iterator to advance.
+// - value: Output pointer to the next element.
+//
+// Returns:
+// - true when a next element was found.
+// - false when iteration is complete.
+template <typename T>
+bool cmnIterate(CmnHandleMapIterator<T>* iter, T** value);
+
 #include "handle_map.inc"
 
 #endif // CMN_HANDLEMAP_H

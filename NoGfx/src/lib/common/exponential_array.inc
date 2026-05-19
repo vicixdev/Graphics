@@ -100,13 +100,30 @@ T& cmnLast(CmnExponentialArray<T, N, S>* array) {
 	return (*array)[array->length - 1];
 }
 
-template <typename T, size_t N>
-void cmnPop(CmnExponentialArray<T, N>* array) {
+template <typename T, size_t N, size_t S>
+void cmnPop(CmnExponentialArray<T, N, S>* array) {
 	if (array->length == 0) {
 		return;
 	}
 
 	array->length--;
+}
+
+template <typename T, size_t N, size_t S>
+void cmnCreateExponentialArrayIterator(CmnExponentialArray<T, N, S>* array, CmnExponentialArrayIterator<T, N, S>* iter) {
+	iter->array = array;
+	iter->currentIndex = 0;
+}
+
+template <typename T, size_t N, size_t S>
+bool cmnIterate(CmnExponentialArrayIterator<T, N, S>* iter, T** value) {
+	if (iter->currentIndex >= iter->array->length) {
+		return false;
+	}
+
+	*value = &(*iter->array)[iter->currentIndex];
+	iter->currentIndex++;
+	return true;
 }
 
 inline void cmnDecomposeExponentialArrayIndex(size_t index, size_t firstBucketBitCount, size_t* bucketIndex, size_t* elementIndex) {
