@@ -29,6 +29,7 @@ typedef enum GpuResult {
 	GPU_NO_SUCH_SEMAPHORE_FOUND,
 	GPU_NO_SUCH_DEPTH_STENCIL_STATE_FOUND,
 	GPU_NO_SUCH_BLEND_STATE_FOUND,
+	GPU_NO_SUCH_SURFACE_FOUND,
 	GPU_ALLOCATION_MEMORY_IS_GPU,
 	GPU_ALLOCATION_MEMORY_IS_CPU,
 
@@ -42,6 +43,7 @@ typedef enum GpuResult {
 	GPU_COUND_NOT_CREATE_QUEUE,
 	GPU_COUND_NOT_CREATE_COMMAND_BUFFER,
 	GPU_COULD_NOT_CREATE_NATIVE_OBJECT,
+	GPU_OUT_OF_DRAWABLES,
 
 	GPU_UNSUPPORTED_OPERATION,
 
@@ -193,6 +195,18 @@ typedef enum GpuFactor {
 	GPU_FACTOR_SRC_ALPHA,
 } GpuFactor;
 
+typedef enum GpuSurfaceType {
+	GPU_SURFACE_IMMEDIATE = 0,
+	GPU_SURFACE_VSYNC,
+} GpuSurfaceType;
+
+typedef enum GpuSurfaceTargetType {
+	GPU_SURFACE_COCOA = 0,
+	GPU_SURFACE_HWND,
+	GPU_SURFACE_X11,
+	GPU_SURFACE_WAYLAND,
+} GpuSurfaceTargetType;
+
 #define GPU_DEFAULT_WAIT_MASK (~(uint64_t)0)
 
 typedef size_t GpuDeviceId;
@@ -203,6 +217,7 @@ typedef uint64_t GpuBlendState;
 typedef uint64_t GpuQueue;
 typedef uint64_t GpuCommandBuffer;
 typedef uint64_t GpuSemaphore;
+typedef uint64_t GpuSurface;
 
 typedef struct GpuDeviceCapabilites {
 	const GpuSignal* supportedSignals;
@@ -323,6 +338,48 @@ typedef struct GpuRenderPassDesc {
 	size_t colorTargetCount;
 } GpuRenderPassDesc;
 
+typedef struct GpuSurfaceCocoaTarget {
+	// Pointer to the target NSView
+	void* nsView;
+} GpuSurfaceCocoaTarget;
+
+typedef struct GpuSurfaceHWNDTarget {
+	void* hInstance;
+	void* hWnd;
+} GpuSurfaceHWNDTarget;
+
+typedef struct GpuSurfaceWaylandTarget {
+	// a `wl_display`
+	void* display;
+	// a `wl_surface`
+	void* surface;
+} GpuSurfaceWaylandTarget;
+
+typedef struct GpuSurfaceXTarget {
+	// pointer to X11 `Display`
+	void* display;
+	// pointer to X11 `Window`
+	void* window;
+} GpuSurfaceXTarget;
+
+typedef struct GpuSurfaceTarget {
+	GpuSurfaceTargetType type;
+	union {
+		GpuSurfaceCocoaTarget cocoa;
+		GpuSurfaceHWNDTarget hwnd;
+		GpuSurfaceXTarget x11;
+		GpuSurfaceWaylandTarget wayland;
+	};
+} GpuSurfaceTarget;
+
+typedef struct GpuSurfaceDesc {
+	GpuSurfaceType type;
+	GpuFormat format;
+	uint32_t size[2];
+	uint32_t framesInFlight;
+	GpuSurfaceTarget target;
+} GpuSurfaceDesc;
+
 typedef struct GpuIndirectDispatchArgs {
 	uint32_t gridDimensions[3];
 	uint32_t _pad;
@@ -356,6 +413,11 @@ typedef struct GpuLayer {
 	bool (*gpuCreateTexture)(const GpuTextureDesc* desc, void* ptrGpu, GpuResult* result);
 	bool (*gpuTextureViewDescriptor)(GpuTexture texture, const GpuViewDesc* desc, GpuResult* result);
 	bool (*gpuRWTextureViewDescriptor)(GpuTexture texture, const GpuViewDesc* desc, GpuResult* result);
+
+	bool (*gpuCreateSurface)(const GpuSurfaceDesc* desc, GpuResult* result);
+	bool (*gpuResizeSurface)(GpuSurface surface, uint32_t size[2], GpuResult* result);
+	bool (*gpuAcquireNextDrawable)(GpuSurface surface, GpuResult* result);
+	bool (*gpuFreeSurface)(GpuSurface surface);
 
 	bool (*gpuCreateComputePipeline)(
 		const uint8_t* ir, size_t irSize,
@@ -397,6 +459,7 @@ typedef struct GpuLayer {
 		uint64_t value,
 		GpuResult* result
 	);
+	bool (*gpuPresent)(GpuQueue queue, GpuSurface surface, GpuResult* result);
 
 	bool (*gpuCreateSemaphore)(uint64_t value, GpuResult* result);
 	bool (*gpuWaitSemaphore)(GpuSemaphore sema, uint64_t value, GpuResult* result);
@@ -453,6 +516,11 @@ GpuTexture gpuCreateTexture(const GpuTextureDesc* desc, void* ptrGpu, GpuResult*
 GpuTextureDescriptor gpuTextureViewDescriptor(GpuTexture texture, const GpuViewDesc* desc, GpuResult* result);
 GpuTextureDescriptor gpuRWTextureViewDescriptor(GpuTexture texture, const GpuViewDesc* desc, GpuResult* result);
 
+GpuSurface gpuCreateSurface(const GpuSurfaceDesc* desc, GpuResult* result);
+void gpuResizeSurface(GpuSurface surface, uint32_t size[2], GpuResult* result);
+void gpuFreeSurface(GpuSurface surface);
+GpuTexture gpuAcquireNextDrawable(GpuSurface surface, GpuResult* result);
+
 GpuPipeline gpuCreateComputePipeline(
 	const uint8_t* ir, size_t irSize,
 	const void* constants, size_t constantsSize,
@@ -493,6 +561,7 @@ void gpuSubmitWithSignal(
 	uint64_t value,
 	GpuResult* result
 );
+void gpuPresent(GpuQueue queue, GpuSurface surface, GpuResult* result);
 
 GpuSemaphore gpuCreateSemaphore(uint64_t value, GpuResult* result);
 void gpuWaitSemaphore(GpuSemaphore sema, uint64_t value, GpuResult* result);

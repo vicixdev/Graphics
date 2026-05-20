@@ -118,6 +118,29 @@ GpuTexture mtl4CreateTexture(const GpuTextureDesc* desc, void* ptrGpu, GpuResult
 	return mtl4HandleToGpuTexture(handle);
 }
 
+GpuTexture mtl4CreateSurfaceTexture(id<CAMetalDrawable> drawable, id<MTLResidencySet> residencySet, GpuResult* result) {
+	assert(drawable != nil);
+
+	CmnResult localResult;
+
+	Mtl4TextureMetadata metadata = {};
+	metadata.type = MTL4_TEXTURE_SURFACE;
+	metadata.drawable = drawable;
+	metadata.drawableResidencySet = residencySet;
+	// metadata.texture = drawable.texture;
+
+	CmnScopedStorageSyncLockWrite guard(&gMtl4TextureStorage.sync);
+
+	Mtl4Texture handle = cmnInsert(&gMtl4TextureStorage.textures, metadata, &localResult);
+	if (localResult != CMN_SUCCESS) {
+		CMN_SET_RESULT(result, GPU_OUT_OF_CPU_MEMORY);
+		return {};
+	}
+
+	CMN_SET_RESULT(result, GPU_SUCCESS);
+	return mtl4HandleToGpuTexture(handle);
+}
+
 GpuTextureSizeAlign mtl4TextureSizeAlign(const GpuTextureDesc* desc, GpuResult* result) {
 	CmnScopedNSAutoreleasePool pool;
 
@@ -210,17 +233,20 @@ GpuTextureDescriptor mtl4RWTextureViewDescriptor(GpuTexture texture, const GpuVi
 	return mtl4TextureViewDescriptor(texture, desc, result);
 }
 
-void mtl4FreeTexture(Mtl4Texture texture) {
+void mtl4FreeTexture(GpuTexture texture) {
 	CmnScopedNSAutoreleasePool pool;
 
-	Mtl4TextureMetadata* metadata = mtl4AcquireTextureMetadataFrom(texture);
+	Mtl4Texture handle = mtl4GpuTextureToHadle(texture);
+	Mtl4TextureMetadata* metadata = mtl4AcquireTextureMetadataFrom(handle);
 	if (metadata == nullptr) {
 		return;
 	}
-	defer (mtl4ReleaseTextureMetadata());
 
 	cmnAtomicStore(&metadata->scheduledForDeletion, true);
-	mtl4ScheduleTextureForDeletion(texture);
+	mtl4ReleaseTextureMetadata();
+
+	mtl4ScheduleTextureForDeletion(handle);
+	mtl4CheckForResourceDeletion();
 }
 
 bool mtl4IsTextureScheduledForDeletion(Mtl4Texture texture) {
@@ -292,7 +318,7 @@ void mtl4AssociateViewToTexture(Mtl4TextureMetadata* metadata, id<MTLTexture> vi
 	CMN_SET_RESULT(result, GPU_SUCCESS);
 }
 
-void mtl4FreeAssociatedTextureViews(Mtl4TextureMetadata* metadata) {
+void mtl4DestroyAssociatedTextureViews(Mtl4TextureMetadata* metadata) {
 	CmnKeyedChainIterator<GpuViewDesc, id<MTLTexture>, 8> iter;
 	cmnCreateKeyedChainIterator(&metadata->relatedViews, &iter);
 
@@ -317,8 +343,10 @@ void mtl4DestroyTexture(Mtl4Texture texture) {
 		return;
 	}
 
-	mtl4FreeAssociatedTextureViews(metadata);
-	[metadata->texture release];
+	mtl4DestroyAssociatedTextureViews(metadata);
+	if (metadata->type == MTL4_TEXTURE_NORMAL) {
+		[metadata->texture release];
+	}
 
 	cmnRemove(&gMtl4TextureStorage.textures, texture);
 }

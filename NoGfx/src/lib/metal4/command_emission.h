@@ -66,6 +66,8 @@ void mtl4EmitMultiDrawIndirectPrep(Mtl4CommandEmissionContext* context, Mtl4Rend
 void mtl4EmitRenderpassPrep(Mtl4CommandEmissionContext* context, Mtl4Command* command, GpuResult* result);
 MTLPrimitiveType mtl4EmitDrawSetup(Mtl4CommandEmissionContext* context, Mtl4RenderCommand* command, GpuResult* result);
 
+void mtl4EmitWaitForRenderpassDrawables(Mtl4CommandEmissionContext* context, Mtl4Command* command, GpuResult* result);
+
 void mtl4EmitBeginRenderpass(Mtl4CommandEmissionContext* context, Mtl4Command* command, GpuResult* result);
 void mtl4EmitDraw(Mtl4CommandEmissionContext* context, Mtl4RenderCommand* command, GpuResult* result);
 void mtl4EmitDrawIndirect(Mtl4CommandEmissionContext* context, Mtl4RenderCommand* command, GpuResult* result);

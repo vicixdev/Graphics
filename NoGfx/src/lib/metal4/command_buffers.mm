@@ -75,68 +75,6 @@ GpuCommandBuffer mtl4StartCommandEncoding(GpuQueue queue, GpuResult* result) {
 	return mtl4HandleToGpuCommandBuffer(handle);
 }
 
-void mtl4Submit(Mtl4CommandEmissionContext* emitContext, GpuCommandBuffer* commandBuffers, size_t commandBufferCount, GpuResult* result) {
-	bool didFindAllCommandBuffers = true;
-	GpuResult lastCommandBufferError = GPU_SUCCESS;
-
-	GpuResult localResult;
-	for (size_t i = 0; i < commandBufferCount; i++) {
-		Mtl4CommandBuffer commandBufferHandle = mtl4GpuCommandBufferToHandle(commandBuffers[i]);
-		Mtl4CommandBufferMetadata* commandBuffer = mtl4AcquireCommandBufferMetadataFrom(commandBufferHandle);
-		if (commandBuffer == nullptr) {
-			didFindAllCommandBuffers = false;
-			return;
-		}
-
-		for (size_t j = 0; j < commandBuffer->commands.length; j++) {
-			mtl4EmitCommand(emitContext, &commandBuffer->commands[j], &localResult);
-			if (localResult != GPU_SUCCESS) {
-				lastCommandBufferError = localResult;
-			}
-		}
-	}
-
-	mtl4FlushCommandBuffer(emitContext);
-
-	if (lastCommandBufferError == GPU_SUCCESS && !didFindAllCommandBuffers) {
-		CMN_SET_RESULT(result, GPU_NO_SUCH_COMMAND_BUFFER_FOUND);
-	} else if (lastCommandBufferError != GPU_SUCCESS) {
-		CMN_SET_RESULT(result, lastCommandBufferError);
-	} else {
-		CMN_SET_RESULT(result, GPU_SUCCESS);
-	}
-}
-
-void mtl4Submit(GpuQueue queue, GpuCommandBuffer* commandBuffers, size_t commandBufferCount, GpuResult* result) {
-	(void)queue;
-
-	CmnScopedNSAutoreleasePool pool;
-
-	Mtl4CommandEmissionContext* emitContext = mtl4AcquireCommandEmissionContext({});
-	defer (mtl4ReleaseCommandEmissionContext(queue));
-
-	mtl4Submit(emitContext, commandBuffers, commandBufferCount, result);
-}
-
-void mtl4SubmitWithSignal(
-	GpuQueue queue,
-	GpuCommandBuffer* commandBuffers,
-	size_t commandBufferCount,
-	GpuSemaphore semaphore,
-	uint64_t value,
-	GpuResult* result
-) {
-	(void)queue;
-
-	CmnScopedNSAutoreleasePool pool;
-
-	Mtl4CommandEmissionContext* emitContext = mtl4AcquireCommandEmissionContext(queue);
-	defer (mtl4ReleaseCommandEmissionContext(queue));
-
-	mtl4Submit(emitContext, commandBuffers, commandBufferCount, result);
-	mtl4EmitSemaphoreSignal(emitContext, mtl4GpuSemaphoreToHandle(semaphore), value, result);
-}
-
 void mtl4MemCpy(GpuCommandBuffer cb, void* destGpu, void* srcGpu, size_t size, GpuResult* result) {
 
 	CmnResult localResult;

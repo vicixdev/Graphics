@@ -82,6 +82,26 @@ GpuTextureDescriptor gpuRWTextureViewDescriptor(GpuTexture texture, const GpuVie
 	return {};
 }
 
+GpuSurface gpuCreateSurface(const GpuSurfaceDesc* desc, GpuResult* result) {
+	GPU_LAYERED_CALL(gpuCreateSurface, desc, result);
+
+	return {};
+}
+
+void gpuResizeSurface(GpuSurface surface, uint32_t size[2], GpuResult* result) {
+	GPU_LAYERED_CALL(gpuResizeSurface, surface, size, result)
+}
+
+void gpuFreeSurface(GpuSurface surface) {
+	GPU_LAYERED_CALL(gpuFreeSurface, surface);
+}
+
+GpuTexture gpuAcquireNextDrawable(GpuSurface surface, GpuResult* result) {
+	GPU_LAYERED_CALL(gpuAcquireNextDrawable, surface, result);
+
+	return {};
+}
+
 GpuPipeline gpuCreateComputePipeline(
 	const uint8_t* ir, size_t irSize,
 	const void* constants, size_t constantsSize,
@@ -184,6 +204,10 @@ void gpuSubmitWithSignal(
 	GpuResult* result
 ) {
 	GPU_LAYERED_CALL(gpuSubmitWithSignal, queue, commandBuffers, commandBufferCount, semaphore, value, result);
+}
+
+void gpuPresent(GpuQueue queue, GpuSurface surface, GpuResult* result) {
+	GPU_LAYERED_CALL(gpuPresent, queue, surface, result);
 }
 
 GpuSemaphore gpuCreateSemaphore(uint64_t value, GpuResult* result) {

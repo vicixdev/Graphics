@@ -8,6 +8,7 @@
 #include <lib/common/type_traits.h>
 #include <lib/common/storage_sync.h>
 #include <lib/common/keyed_chain.h>
+#include <QuartzCore/QuartzCore.h>
 #include <Metal/Metal.h>
 
 typedef CmnHandle Mtl4Texture;
@@ -16,13 +17,31 @@ static_assert(sizeof(Mtl4Texture) == sizeof(GpuTexture), "Mtl4Texture and GpuTex
 typedef CmnKeyedChain<GpuViewDesc, id<MTLTexture>, 8> Mtl4TextureViews;
 static_assert(sizeof(CmnKeyedChainNode<GpuViewDesc, id<MTLTexture>, 8>) <= 192, "");
 
+typedef enum Mtl4TextureType {
+	MTL4_TEXTURE_NORMAL,
+	MTL4_TEXTURE_SURFACE,
+} Mtl4TextureType;
+
 typedef struct Mtl4TextureMetadata {
 	// Atomic, Settable once
-	bool scheduledForDeletion;
+	bool			scheduledForDeletion;
+
+	// Final
+	Mtl4TextureType		type;
 	
 	// Final
 	id<MTLTexture>		texture;
+
 	// Final
+	// NOTE: Used only if type is MTL4_TEXTURE_SURFACE
+	id<CAMetalDrawable>	drawable;
+
+	// Final
+	// NOTE: Used only if type is MTL4_TEXTURE_SURFACE
+	id<MTLResidencySet>	drawableResidencySet;
+
+	// Final
+	// NOTE: Zero if type is MTL4_TEXTURE_SURFACE
 	GpuTextureDesc		descriptor;
 
 	Mtl4TextureViews	relatedViews;
@@ -45,10 +64,11 @@ void mtl4FiniTextureStorage(void);
 
 GpuTextureSizeAlign mtl4TextureSizeAlign(const GpuTextureDesc* desc, GpuResult* result);
 GpuTexture mtl4CreateTexture(const GpuTextureDesc* desc, void* ptrGpu, GpuResult* result);
+GpuTexture mtl4CreateSurfaceTexture(id<CAMetalDrawable> drawable, id<MTLResidencySet> residencySet, GpuResult* result);
 GpuTextureDescriptor mtl4TextureViewDescriptor(GpuTexture texture, const GpuViewDesc* desc, GpuResult* result);
 GpuTextureDescriptor mtl4RWTextureViewDescriptor(GpuTexture texture, const GpuViewDesc* desc, GpuResult* result);
 
-void mtl4FreeTexture(Mtl4Texture texture);
+void mtl4FreeTexture(GpuTexture texture);
 bool mtl4IsTextureScheduledForDeletion(Mtl4Texture texture);
 
 Mtl4TextureMetadata* mtl4AcquireTextureMetadataFrom(Mtl4Texture texture);
@@ -78,10 +98,8 @@ MTLTextureViewDescriptor* mtl4GpuViewDescToMtl(id<MTLTexture> referenceTexture, 
 void mtl4AssociateViewToTexture(Mtl4TextureMetadata* metadata, id<MTLTexture> view, const GpuViewDesc* desc, GpuResult* result);
 
 // NOTE: Requires deletion lock on gMtl4TextureStorage.sync
-void mtl4FreeAssociatedTextureViews(Mtl4TextureMetadata* metadata);
+void mtl4DestroyAssociatedTextureViews(Mtl4TextureMetadata* metadata);
 
-// NOTE: Requires deletion lock on gMtl4TextureStorage.sync
-void mtl4FreeTexture(Mtl4Texture texture);
 // NOTE: Requires deletion lock on gMtl4TextureStorage.sync
 void mtl4DestroyTexture(Mtl4Texture texture);
 

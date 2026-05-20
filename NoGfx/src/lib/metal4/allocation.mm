@@ -416,7 +416,7 @@ void mtl4FreeAssociatedTextures(Mtl4AllocationMetadata* metadata) {
 
 	Mtl4Texture* texture;
 	while (cmnIterate(&iter, &texture)) {
-		mtl4FreeTexture(*texture);
+		mtl4FreeTexture(mtl4HandleToGpuTexture(*texture));
 	}
 
 	cmnDestroyChain(&metadata->relatedTextures, cmnPoolAllocator(&gMtl4AllocationStorage.miscPool));

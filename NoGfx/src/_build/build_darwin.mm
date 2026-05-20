@@ -36,6 +36,7 @@
 #include <lib/metal4/depthstencilstates.mm>
 #include <lib/metal4/blend_states.mm>
 #include <lib/metal4/command_emission.mm>
+#include <lib/metal4/surfaces.mm>
 #include <lib/metal4/validation.mm>
 #include <lib/metal4/deletion_manager.cpp>
 

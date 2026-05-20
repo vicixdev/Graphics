@@ -22,6 +22,11 @@ typedef struct GpuBaseLayer {
 	GpuTextureDescriptor (*gpuTextureViewDescriptor)(GpuTexture texture, const GpuViewDesc* desc, GpuResult* result);
 	GpuTextureDescriptor (*gpuRWTextureViewDescriptor)(GpuTexture texture, const GpuViewDesc* desc, GpuResult* result);
 
+	GpuSurface (*gpuCreateSurface)(const GpuSurfaceDesc* desc, GpuResult* result);
+	void (*gpuResizeSurface)(GpuSurface surface, uint32_t size[2], GpuResult* result);
+	void (*gpuFreeSurface)(GpuSurface surface);
+	GpuTexture (*gpuAcquireNextDrawable)(GpuSurface surface, GpuResult* result);
+
 	GpuPipeline (*gpuCreateComputePipeline)(
 		const uint8_t* ir, size_t irSize,
 		const void* constants, size_t constantsSize,
@@ -62,6 +67,7 @@ typedef struct GpuBaseLayer {
 		uint64_t value,
 		GpuResult* result
 	);
+	void (*gpuPresent)(GpuQueue queue, GpuSurface surface, GpuResult* result);
 
 	GpuSemaphore (*gpuCreateSemaphore)(uint64_t value, GpuResult* result);
 	void (*gpuWaitSemaphore)(GpuSemaphore sema, uint64_t value, GpuResult* result);

@@ -10,6 +10,7 @@
 #include <lib/metal4/semaphores.h>
 #include <lib/metal4/depthstencilstates.h>
 #include <lib/metal4/blend_states.h>
+#include <lib/metal4/surfaces.h>
 #include <lib/metal4/validation.h>
 
 GpuBaseLayer gMtl4BaseLayer = {
@@ -24,6 +25,10 @@ GpuBaseLayer gMtl4BaseLayer = {
 	/*gpuCreateTexture=*/				mtl4CreateTexture,
 	/*gpuTextureViewDescriptor=*/			mtl4TextureViewDescriptor,
 	/*gpuRWTextureViewDescriptor=*/			mtl4RWTextureViewDescriptor,
+	/*gpuCreateSurface=*/				mtl4CreateSurface,
+	/*gpuResizeSurface=*/				mtl4ResizeSurface,
+	/*gpuFreeSurface=*/				mtl4FreeSurface,
+	/*gpuAcquireNextDrawable=*/			mtl4AcquireNextDrawable,
 	/*gpuCreateComputePipeline=*/			mtl4CreateComputePipeline,
 	/*gpuCreateRenderPipeline=*/			mtl4CreateRenderPipeline,
 	/*gpuCreateMeshletPipeline=*/			mtl4CreateMeshletPipeline,
@@ -36,6 +41,7 @@ GpuBaseLayer gMtl4BaseLayer = {
 	/*gpuStartCommandEncoding=*/			mtl4StartCommandEncoding,
 	/*gpuSubmit=*/					mtl4Submit,
 	/*gpuSubmitWithSignal=*/			mtl4SubmitWithSignal,
+	/*gpuPresent=*/					mtl4Present,
 	/*gpuCreateSemaphore=*/				mtl4CreateSemaphore,
 	/*gpuWaitSemaphore=*/				mtl4WaitSemaphore,
 	/*gpuDestroySemaphore=*/			mtl4DestroySemaphore,
@@ -75,6 +81,10 @@ GpuLayer gMtl4ValidationLayer = {
 	/*gpuCreateComputePipeline=*/			nullptr,
 	/*gpuCreateRenderPipeline=*/			nullptr,
 	/*gpuCreateMeshletPipeline=*/			nullptr,
+	/*gpuCreateSurface=*/				nullptr,
+	/*gpuResizeSurface=*/				nullptr,
+	/*gpuFreeSurface=*/				nullptr,
+	/*gpuAcquireNextDrawable=*/			nullptr,
 	/*gpuFreePipeline=*/				nullptr,
 	/*gpuCreateDepthStencilState=*/			nullptr,
 	/*gpuCreateBlendState=*/			nullptr,
@@ -84,6 +94,7 @@ GpuLayer gMtl4ValidationLayer = {
 	/*gpuStartCommandEncoding=*/			nullptr,
 	/*gpuSubmit=*/					nullptr,
 	/*gpuSubmitWithSignal=*/			nullptr,
+	/*gpuPresent=*/					nullptr,
 	/*gpuCreateSemaphore=*/				nullptr,
 	/*gpuWaitSemaphore=*/				nullptr,
 	/*gpuDestroySemaphore=*/			nullptr,

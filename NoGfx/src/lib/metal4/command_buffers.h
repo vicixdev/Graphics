@@ -67,17 +67,6 @@ void mtl4FiniCommandBufferStorage(void);
 
 GpuCommandBuffer mtl4StartCommandEncoding(GpuQueue queue, GpuResult* result);
 
-void mtl4Submit(Mtl4CommandEmissionContext* emitContext, GpuCommandBuffer* commandBuffers, size_t commandBufferCount, GpuResult* result);
-void mtl4Submit(GpuQueue queue, GpuCommandBuffer* commandBuffers, size_t commandBufferCount, GpuResult* result);
-void mtl4SubmitWithSignal(
-	GpuQueue queue,
-	GpuCommandBuffer* commandBuffers,
-	size_t commandBufferCount,
-	GpuSemaphore semaphore,
-	uint64_t value,
-	GpuResult* result
-);
-
 void mtl4MemCpy(GpuCommandBuffer cb, void* destGpu, void* srcGpu, size_t size, GpuResult* result);
 void mtl4CopyToTexture(GpuCommandBuffer cb, void* destGpu, void* srcGpu, GpuTexture texture, GpuResult* result);
 void mtl4CopyFromTexture(GpuCommandBuffer cb, void* destGpu, void* srcGpu, GpuTexture texture, GpuResult* result);

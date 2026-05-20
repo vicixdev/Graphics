@@ -10,6 +10,7 @@
 #include <lib/metal4/shader/prep_multidrawindirect.h>
 
 void mtl4InitCommandEmissionContext(Mtl4CommandEmissionContext* context, Mtl4QueueMetadata* queue, GpuResult* result) {
+
 	context->bumpBuffer = [gMtl4Context.device
 		newBufferWithLength:1024*1024
 		options:MTLResourceStorageModeShared | MTLResourceCPUCacheModeWriteCombined
@@ -660,6 +661,29 @@ void mtl4EmitMultiDrawIndirectPrep(Mtl4CommandEmissionContext* context, Mtl4Rend
 	draw->preparedIcbRangeOffset = rangeOffset;
 }
 
+void mtl4EmitWaitForRenderpassDrawables(Mtl4CommandEmissionContext* context, Mtl4Command* command, GpuResult* result) {
+	assert(command->type == MTL4_CMD_RENDERPASS);
+
+	Mtl4CommandRenderPass* renderPass = &command->renderPass;
+
+	for (size_t i = 0; i < renderPass->desc->colorTargetCount; i++) {
+		Mtl4Texture targetHandle = mtl4GpuTextureToHadle(renderPass->desc->colorTargets[i].texture);
+		Mtl4TextureMetadata* targetMetadata = mtl4AcquireTextureMetadataFrom(targetHandle);
+		if (targetMetadata == nullptr) {
+			CMN_SET_RESULT(result, GPU_NO_SUCH_TEXTURE_FOUND);
+			return;
+		}
+		defer (mtl4ReleaseTextureMetadata());
+
+		if (targetMetadata->type == MTL4_TEXTURE_SURFACE) {
+			[context->queue addResidencySet:targetMetadata->drawableResidencySet];
+			[context->queue waitForDrawable:targetMetadata->drawable];
+		}
+	}
+
+	CMN_SET_RESULT(result, GPU_SUCCESS);
+}
+
 void mtl4EmitRenderpassPrep(Mtl4CommandEmissionContext* context, Mtl4Command* command, GpuResult* result) {
 	assert(command->type == MTL4_CMD_RENDERPASS);
 
@@ -716,7 +740,6 @@ void mtl4EmitBeginRenderpass(Mtl4CommandEmissionContext* context, Mtl4Command* c
 		defer (mtl4ReleaseTextureMetadata());
 
 		MTLRenderPassColorAttachmentDescriptor* colorAttachment = [[MTLRenderPassColorAttachmentDescriptor new] autorelease];
-		colorAttachment.texture = targetTexture->texture;
 		colorAttachment.loadAction = gMtl4GpuTargetOpToMtlLoadAction[target->loadOp];
 		colorAttachment.storeAction = gMtl4GpuTargetOpToMtlStoreAction[target->storeOp];
 		colorAttachment.clearColor = MTLClearColorMake(
@@ -725,6 +748,12 @@ void mtl4EmitBeginRenderpass(Mtl4CommandEmissionContext* context, Mtl4Command* c
 			target->clearColor[2],
 			target->clearColor[3]
 		);
+
+		if (targetTexture->type == MTL4_TEXTURE_SURFACE) {
+			colorAttachment.texture = [targetTexture->drawable texture];
+		} else {
+			colorAttachment.texture = targetTexture->texture;
+		}
 
 		renderPassDesc.colorAttachments[i] = colorAttachment;
 
@@ -868,6 +897,7 @@ void mtl4EmitMultiDrawIndirect(Mtl4CommandEmissionContext* context, Mtl4RenderCo
 void mtl4EmitRenderpass(Mtl4CommandEmissionContext* context, Mtl4Command* command, GpuResult* result) {
 	assert(command->type == MTL4_CMD_RENDERPASS);
 
+	mtl4EmitWaitForRenderpassDrawables(context, command, result);
 	if (command->renderPass.requiresPreparation) {
 		mtl4EmitRenderpassPrep(context, command, result);
 	}

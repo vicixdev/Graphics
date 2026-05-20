@@ -34,9 +34,21 @@ void mtl4FiniQueueStorage(void);
 
 GpuQueue mtl4CreateQueue(GpuResult* result);
 
+void mtl4Submit(Mtl4CommandEmissionContext* emitContext, GpuCommandBuffer* commandBuffers, size_t commandBufferCount, GpuResult* result);
+void mtl4Submit(GpuQueue queue, GpuCommandBuffer* commandBuffers, size_t commandBufferCount, GpuResult* result);
+void mtl4SubmitWithSignal(
+	GpuQueue queue,
+	GpuCommandBuffer* commandBuffers,
+	size_t commandBufferCount,
+	GpuSemaphore semaphore,
+	uint64_t value,
+	GpuResult* result
+);
+void mtl4Present(GpuQueue queue, GpuSurface surface, GpuResult* result);
+
 Mtl4QueueMetadata* mtl4QueueMetadataOf(Mtl4Queue queue);
 
-Mtl4CommandEmissionContext* mtl4AcquireCommandEmissionContext(Mtl4Queue queue);
+Mtl4CommandEmissionContext* mtl4AcquireCommandEmissionContext(Mtl4Queue queue, GpuResult* result);
 void mtl4ReleaseCommandEmissionContext(Mtl4Queue queue);
 
 inline void mtl4LockQueue(Mtl4QueueMetadata* metadata) {
