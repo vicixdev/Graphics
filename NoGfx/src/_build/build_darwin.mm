@@ -22,6 +22,7 @@
 #include <lib/common/storage_sync.cpp>
 #include <lib/common/memory.cpp>
 #include <lib/common/heap_allocator.cpp>
+#include <lib/common/tlsf/tlsf.cpp>
 
 #include <lib/lib.cpp>
 #include <lib/layers.cpp>

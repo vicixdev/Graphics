@@ -15,6 +15,7 @@
 #include "handle_map_static.cpp"
 #include "btree.cpp"
 #include "storage_sync.cpp"
+#include "tlsf.cpp"
 
 #include "gpu_common.cpp"
 #include "gpu_init.cpp"
@@ -51,6 +52,12 @@ TestRecord gCommonTests[] = {
 	{ "Check heap raw realloc preserves and zeros",			checkHeapRawReallocPreservesAndZeros		},
 	{ "Check heap typed realloc preserves and zeros",		checkHeapTypedReallocPreservesAndZeros		},
 	{ "Check heap aligned raw allocation",				checkHeapAlignedRawAllocation			},
+
+	{ "Check TLSF index mapping boundaries",			checkTlsfIndexMappingBoundaries			},
+	{ "Check TLSF first free mapping selects split block",		checkTlsfFirstFreeMappingSelectsSplitBlock	},
+	{ "Check TLSF split allocation and coalescing",			checkTlsfSplitAllocationAndCoalescing		},
+	{ "Check TLSF exact fit allocation and OOM",			checkTlsfExactFitAllocationAndOOM		},
+	{ "Check TLSF aligned allocation", 				checkTlsfAlignedAllocation				},
 
 	{ "Check for handle map data coherency",			checkForHandleMapDataCoherency			},
 	{ "Check for handle map bucket reusage",			checkForHandleMapBucketReusage			},
