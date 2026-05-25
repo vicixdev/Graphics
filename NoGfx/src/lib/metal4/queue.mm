@@ -36,6 +36,7 @@ void mtl4FiniQueueStorage(void) {
 
 	Mtl4QueueMetadata* queue;
 	while(cmnIterate(&iter, &queue)) {
+		mtl4FiniCommandEmissionContext(&queue->emissionContext);
 		[queue->queue release];
 	}
 

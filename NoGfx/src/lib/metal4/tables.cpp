@@ -122,6 +122,23 @@ const MTLStoreAction gMtl4GpuTargetOpToMtlStoreAction[] {
 const MTLPrimitiveType gMtl4GpuTopologyToMtlPrimitive[] {
 	/*GPU_TOPOLOGY_TRIANGLE_LIST=*/	MTLPrimitiveTypeTriangle,
 	/*GPU_TOPOLOGY_TRIANGLE_STRIP=*/MTLPrimitiveTypeTriangleStrip,
-	/*GPU_TOPOLOGY_TRIANGLE_FAN=*/ 	(MTLPrimitiveType)-1,
+	/*GPU_TOPOLOGY_TRIANGLE_FAN=*/	(MTLPrimitiveType)-1,
+};
+
+const MTLBlendOperation gMtl4GpuBlendToMtlBlendOperation[] {
+	/*GPU_BLEND_ADD=*/		MTLBlendOperationAdd,
+	/*GPU_BLEND_SUBTRACT=*/		MTLBlendOperationSubtract,
+	/*GPU_BLEND_REV_SUBTRACT=*/	MTLBlendOperationReverseSubtract,
+	/*GPU_BLEND_MIN=*/		MTLBlendOperationMin,
+	/*GPU_BLEND_MAX=*/		MTLBlendOperationMax,
+};
+
+const MTLBlendFactor gMtl4GpuFactorToMtlBlendFactor [] {
+	/*GPU_FACTOR_ZERO=*/		MTLBlendFactorZero,
+	/*GPU_FACTOR_ONE=*/		MTLBlendFactorOne,
+	/*GPU_FACTOR_SRC_COLOR=*/	MTLBlendFactorSourceColor,
+	/*GPU_FACTOR_DST_COLOR=*/	MTLBlendFactorDestinationColor,
+	/*GPU_FACTOR_SRC_ALPHA=*/	MTLBlendFactorSourceAlpha,
+	
 };
 

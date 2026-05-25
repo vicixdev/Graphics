@@ -9,6 +9,7 @@
 
 static const GpuSignal gMtl4SupportedSignals[] = { GPU_SIGNAL_ATOMIC_MAX };
 static const GpuOp gMtl4SupportedWaitOps[] = { GPU_OP_GREATER_EQUAL };
+static const GpuFormat gMtl4SupportedSurfaceFormats[] = { GPU_FORMAT_RGBA8_UNORM, GPU_FORMAT_RGBA8_SRGB };
 
 static const GpuDeviceCapabilites gMtl4CommonDeviceCapabilites = {
 	/*supportedSignals=*/		&gMtl4SupportedSignals[0],
@@ -18,6 +19,10 @@ static const GpuDeviceCapabilites gMtl4CommonDeviceCapabilites = {
 	/*supportsArbitraryWaitMask=*/	false,
 	/*gpuReadableSignals=*/		true,
 	/*gpuWritableSignals=*/		false,
+	/*supportsMeshShaders=*/	false,
+	/*supportsDynamicBlendStates=*/	false,
+	/*supportedSurfaceFormats=*/	&gMtl4SupportedSurfaceFormats[0],
+	/*supportedSurfaceFormatCount=*/CMN_COUNT_OF(gMtl4SupportedSurfaceFormats),
 };
 
 bool mtl4CheckDeviceSuitability(id<MTLDevice> device) {

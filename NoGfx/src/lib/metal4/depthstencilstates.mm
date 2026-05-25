@@ -27,7 +27,17 @@ void mtl4InitDepthStencilStorage(GpuResult* result) {
 }
 
 void mtl4FiniDepthStencilStorage(void) {
+	CmnHandleMapIterator<Mtl4DepthStencilStateMetadata> iter;
+	cmnCreateHandleMapIterator(&gMtl4DepthStencilStateStorage.depthStencilStates, &iter);
+
+	Mtl4DepthStencilStateMetadata* depthStencil;
+	while (cmnIterate(&iter, &depthStencil)) {
+		[depthStencil->depthStencilState release];
+	}
+
 	cmnDestroyPage(gMtl4DepthStencilStateStorage.page);
+
+	gMtl4DepthStencilStateStorage = {};
 }
 
 GpuDepthStencilState mtl4CreateDepthStencilState(const GpuDepthStencilDesc* desc, GpuResult* result) {

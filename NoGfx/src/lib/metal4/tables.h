@@ -13,6 +13,8 @@ extern const MTLStencilOperation gMtl4GpuOpToMtlStencilOperation[/*GpuOp		*/];
 extern const MTLLoadAction	gMtl4GpuTargetOpToMtlLoadAction	[/*GpuTargetOp		*/];
 extern const MTLStoreAction	gMtl4GpuTargetOpToMtlStoreAction[/*GpuTargetOp		*/];
 extern const MTLPrimitiveType	gMtl4GpuTopologyToMtlPrimitive	[/*GpuTopology		*/];
+extern const MTLBlendOperation	gMtl4GpuBlendToMtlBlendOperation[/*GpuBlend		*/];
+extern const MTLBlendFactor	gMtl4GpuFactorToMtlBlendFactor	[/*GpuFactor		*/];
 
 #endif // MTL4_TABLES_H
 

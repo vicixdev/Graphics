@@ -47,9 +47,6 @@ else
 	CPP_ARGS=("${DBG_CPP_ARGS[@]}")
 fi
 
-echo ${METAL_ARGS[@]}
-echo ${CPP_ARGS[@]}
-
 
 for i in "${!SHADER_SOURCES[@]}"; do
 	shaderSource="${SHADER_SOURCES[$i]}"

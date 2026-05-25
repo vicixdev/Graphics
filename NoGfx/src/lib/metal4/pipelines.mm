@@ -386,6 +386,16 @@ Mtl4Pipeline mtl4CreateGraphicsPipeline(Mtl4Function vertex, Mtl4Function fragme
 		pipelineDesc.colorAttachments[i] = colorAttachment;
 	}
 
+	if (desc->blendstate != nullptr && desc->colorTargetCount > 0) {
+		pipelineDesc.colorAttachments[0].blendingState = MTL4BlendStateEnabled;
+		pipelineDesc.colorAttachments[0].rgbBlendOperation = gMtl4GpuBlendToMtlBlendOperation[desc->blendstate->colorOp];
+		pipelineDesc.colorAttachments[0].sourceRGBBlendFactor = gMtl4GpuFactorToMtlBlendFactor[desc->blendstate->srcColorFactor];
+		pipelineDesc.colorAttachments[0].destinationRGBBlendFactor = gMtl4GpuFactorToMtlBlendFactor[desc->blendstate->dstColorFactor];
+		pipelineDesc.colorAttachments[0].alphaBlendOperation = gMtl4GpuBlendToMtlBlendOperation[desc->blendstate->alphaOp];
+		pipelineDesc.colorAttachments[0].sourceAlphaBlendFactor = gMtl4GpuFactorToMtlBlendFactor[desc->blendstate->srcAlphaFactor];
+		pipelineDesc.colorAttachments[0].destinationAlphaBlendFactor = gMtl4GpuFactorToMtlBlendFactor[desc->blendstate->dstAlphaFactor];
+		pipelineDesc.colorAttachments[0].writeMask = desc->blendstate->colorWriteMask;
+	}
 
 	NSError* error;
 	id<MTLRenderPipelineState> pso = [gMtl4PipelineStorage.compiler

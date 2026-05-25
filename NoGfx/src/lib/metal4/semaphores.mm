@@ -27,7 +27,16 @@ void mtl4InitSemaphoreStorage(GpuResult* result) {
 }
 
 void mtl4FiniSemaphoreStorage(void) {
+	CmnHandleMapIterator<Mtl4SemaphoreMetadata> iter;
+	cmnCreateHandleMapIterator(&gMtl4SemaphoreStorage.semaphores, &iter);
+
+	Mtl4SemaphoreMetadata* metadata;
+	while (cmnIterate(&iter, &metadata)) {
+		[metadata->event release];
+	}
+	
 	cmnDestroyPage(gMtl4SemaphoreStorage.page);
+
 	gMtl4SemaphoreStorage = {};
 }
 

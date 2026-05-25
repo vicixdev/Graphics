@@ -32,6 +32,8 @@ typedef enum GpuResult {
 	GPU_NO_SUCH_SURFACE_FOUND,
 	GPU_ALLOCATION_MEMORY_IS_GPU,
 	GPU_ALLOCATION_MEMORY_IS_CPU,
+	GPU_NO_PIPELINE_BOUND,
+	GPU_NOT_ENCODING_RENDERPASS,
 
 	GPU_PIPELINE_IR_VALIDATION_FAILED,
 	GPU_INCOMPATIBLE_PIPELINE,
@@ -49,6 +51,7 @@ typedef enum GpuResult {
 
 	// Only active while validation is enabled.
 	GPU_USE_AFTER_FREE,
+	GPU_SEMAPHORE_VALUE_ALREADY_SIGNALED,
 
 	GPU_GENERAL_ERROR,
 } GpuResult;
@@ -229,6 +232,13 @@ typedef struct GpuDeviceCapabilites {
 	bool supportsArbitraryWaitMask;
 	bool gpuReadableSignals;
 	bool gpuWritableSignals;
+
+	bool supportsMeshShaders;
+
+	bool supportsDynamicBlendStates;
+
+	const GpuFormat* supportedSurfaceFormats;
+	size_t supportedSurfaceFormatCount;
 
 	// TODO: more capabilities...
 } GpuDeviceCapabilites;
