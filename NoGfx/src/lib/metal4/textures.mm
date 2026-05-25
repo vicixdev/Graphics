@@ -85,7 +85,7 @@ GpuTexture mtl4CreateTexture(const GpuTextureDesc* desc, void* ptrGpu, GpuResult
 
 	id<MTLTexture> texture = [allocation->backing
 		newTextureWithDescriptor:textureDescriptor
-		offset:offsetFromBase];
+		offset:allocation->offsetInBacking + offsetFromBase];
 	if (texture == nil) {
 		CMN_SET_RESULT(result, GPU_OUT_OF_GPU_MEMORY);
 		return {};

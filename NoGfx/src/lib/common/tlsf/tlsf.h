@@ -8,7 +8,7 @@
 #define TLSF_MEMORY_POOL_SIZE (64 * 1024 * 1024)
 
 // TLSF_FLI == min(log_2(block_size), 32)
-#define TLSF_FLI 26
+#define TLSF_FLI 27
 
 #define TLSF_SLI_DIVISIONS 16
 // TLSF_SLI == log_2(SLI_DIVISIONS)

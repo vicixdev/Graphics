@@ -10,12 +10,15 @@
 #include <lib/common/pointer_map.h>
 #include <lib/common/element_pool.h>
 #include <lib/common/storage_sync.h>
+#include <lib/common/tlsf/tlsf.h>
 #include <lib/metal4/textures.h>
 
 
 // NOTE: 2 * cacheline
 #define MTL4_ALLOCATIONS_MISCPOOLSLOT_SIZE 128
 #define MTL4_ALLOCATIONS_NODESPOLLSLOT_SIZE sizeof(CmnBTreeNode<Mtl4AddressRange, Mtl4AllocationHandle>)
+
+#define MTL4_SMALL_MEMORY_THRESHOLD 16 * 1024 * 1024
 
 
 typedef CmnHandle Mtl4AllocationHandle;
@@ -25,6 +28,14 @@ typedef struct Mtl4AddressRange {
 	size_t		length;
 } Mtl4AddressRange;
 
+typedef struct Mtl4LargeAllocationMetadata {
+} Mtl4LargeAllocationMetadata;
+
+typedef struct Mtl4SmallAllocationMetadata {
+	TlsfAllocation	allocation;
+	TlsfPool*	pool;
+} Mtl4SmallAllocationMetadata;
+
 typedef struct Mtl4AllocationMetadata {
 	GpuMemory	memory;
 	uintptr_t	cpuPtr;
@@ -32,7 +43,15 @@ typedef struct Mtl4AllocationMetadata {
 	size_t		size;
 
 	bool		sheduledForDeletion;
+	bool		isSmallAllocation;
 
+	union {
+		Mtl4LargeAllocationMetadata large;
+		Mtl4SmallAllocationMetadata small;
+	};
+
+	size_t		offsetInBacking;
+	// NOTE: Owning only if big allocation
 	id<MTLHeap>	backing;
 	id<MTLBuffer>	buffer;
 
@@ -43,6 +62,12 @@ static_assert(
 	sizeof(CmnChainNode<Mtl4Texture, 14>) <= MTL4_ALLOCATIONS_MISCPOOLSLOT_SIZE,
 	"A chain node should be able to be contained in the misc pool."
 );
+
+typedef struct Mtl4SmallAllocationStorage {
+	id<MTLHeap>	heap;
+	TlsfPool	pool;
+	CmnMutex	mutex;
+} Mtl4SmallAllocationStorage;
 
 typedef struct Mtl4AllocationStorage {
 	CmnPage		arenaPage;
@@ -60,6 +85,10 @@ typedef struct Mtl4AllocationStorage {
 
 	CmnHandleMap	<Mtl4AllocationMetadata>	allocations;
 
+	CmnExponentialArray	<Mtl4SmallAllocationStorage>		defaultSmallAllocations;
+	CmnExponentialArray	<Mtl4SmallAllocationStorage>		privateSmallAllocations;
+	CmnExponentialArray	<Mtl4SmallAllocationStorage>		readbackSmallAllocations;
+
 	CmnStorageSync	sync;
 } Mtl4AllocationStorage;
 extern Mtl4AllocationStorage gMtl4AllocationStorage;
@@ -76,7 +105,21 @@ void* mtl4Malloc(size_t size, size_t align, GpuMemory memory, GpuResult* result)
 void  mtl4Free(void* ptr);
 void* mtl4HostToDevicePointer(void* ptr, GpuResult* result);
 
+void mtl4BigAllocate(Mtl4AllocationMetadata* metadata, size_t size, size_t align, GpuMemory memory, GpuResult* result);
+void mtl4SmallAllocate(Mtl4AllocationMetadata* metadata, size_t size, size_t align, GpuMemory memory, GpuResult* result);
+
 id<MTLHeap> mtl4AllocateHeap(size_t size, size_t align, GpuMemory memory, GpuResult* result);
+id<MTLBuffer> mtl4AllocateSmallMemory(
+	size_t size,
+	size_t align,
+	GpuMemory memory,
+	Mtl4SmallAllocationMetadata* allocation,
+	id<MTLHeap>* heap,
+	size_t* offsetInHeap,
+	GpuResult* result
+);
+
+void mtl4AllocateSmallAllocationStorage(GpuMemory memory, GpuResult* localResult);
 
 inline bool mtl4IsCpuAddress(Mtl4AllocationMetadata* metadata, void* ptr) {
 	return metadata->cpuPtr <= (uintptr_t)ptr && (uintptr_t)ptr < metadata->cpuPtr + metadata->size;

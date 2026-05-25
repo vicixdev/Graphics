@@ -71,6 +71,15 @@ void mtl4InitAllocationStorage(GpuResult* result) {
 	cmnCreateHandleMap(&gMtl4AllocationStorage.allocations, arenaAllocator, {}, &localResult);
 	assert(localResult == CMN_SUCCESS && "The handle map creation should not fail.");
 
+	cmnCreateExponentialArray(&gMtl4AllocationStorage.defaultSmallAllocations, arenaAllocator, &localResult);
+	assert(localResult == CMN_SUCCESS && "The exponental array creation should not fail.");
+
+	cmnCreateExponentialArray(&gMtl4AllocationStorage.privateSmallAllocations, arenaAllocator, &localResult);
+	assert(localResult == CMN_SUCCESS && "The exponental array creation should not fail.");
+
+	cmnCreateExponentialArray(&gMtl4AllocationStorage.readbackSmallAllocations, arenaAllocator, &localResult);
+	assert(localResult == CMN_SUCCESS && "The exponental array creation should not fail.");
+
 	CMN_SET_RESULT(result, GPU_SUCCESS);
 	return;
 }
@@ -95,6 +104,176 @@ void mtl4FiniAllocationStorage(void) {
 	gMtl4AllocationStorage = {};
 }
 
+void mtl4BigAllocate(Mtl4AllocationMetadata* metadata, size_t size, size_t align, GpuMemory memory, GpuResult* result) {
+	GpuResult localGpuResult = GPU_SUCCESS;
+
+	id<MTLHeap> heap = mtl4AllocateHeap(size, align, memory, &localGpuResult);
+	if (localGpuResult != GPU_SUCCESS) {
+		CMN_SET_RESULT(result, localGpuResult);
+		return;
+	}
+
+	id<MTLBuffer> buffer = [heap
+		newBufferWithLength:size
+		options:gMtl4ResourceOptionsFor[memory]
+		offset:0];
+	assert(buffer != nil && "If the heap allocation succeeded, then the buffer allocation should also succeed.");
+
+	metadata->memory	= memory;
+	metadata->gpuPtr	= [buffer gpuAddress];
+	metadata->size		= size;
+	metadata->backing	= heap;
+	metadata->buffer	= buffer;
+
+	if (memory != GPU_MEMORY_GPU) {
+		metadata->cpuPtr = (uintptr_t)[buffer contents];
+	}
+}
+
+id<MTLBuffer> mtl4AllocateSmallMemory(
+	size_t size,
+	size_t align,
+	GpuMemory memory,
+	Mtl4SmallAllocationMetadata* allocation,
+	id<MTLHeap>* heap,
+	size_t* offsetInHeap,
+	GpuResult* result
+) {
+	CmnResult localResult;
+	GpuResult localGpuResult;
+
+	CmnExponentialArray<Mtl4SmallAllocationStorage>* storages;
+	switch (memory) {
+		case GPU_MEMORY_DEFAULT: {
+			storages = &gMtl4AllocationStorage.defaultSmallAllocations;
+			break;
+		}
+		case GPU_MEMORY_GPU: {
+			storages = &gMtl4AllocationStorage.privateSmallAllocations;
+			break;
+		}
+		case GPU_MEMORY_READBACK: {
+			storages = &gMtl4AllocationStorage.readbackSmallAllocations;
+			break;
+		}
+	}
+
+	// TODO: Finer locking.
+	CmnScopedStorageSyncLockWrite guard(&gMtl4AllocationStorage.sync);
+
+	id<MTLHeap> tlsfHeap;
+	TlsfAllocation tlsfAllocation;
+	TlsfPool* pool;
+	uint32_t offset;
+
+	size_t i = 0;
+	for (;;) {
+		if (storages->length >= i) {
+			mtl4AllocateSmallAllocationStorage(memory, &localGpuResult);
+			if (localGpuResult != GPU_SUCCESS) {
+				CMN_SET_RESULT(result, localGpuResult);
+				return nil;
+			}
+		}
+		Mtl4SmallAllocationStorage* storage = &cmnGet(storages, i);
+		
+		size_t actualAlign = align;
+		if (actualAlign < 256) {
+			actualAlign = 256;
+		}
+
+		tlsfHeap = storage->heap;
+		pool = &storage->pool;
+		tlsfAllocation = tlsfAlloc(&storage->pool, size, actualAlign, &offset, &localResult);
+		if (localResult == CMN_SUCCESS) {
+			break;
+		}
+
+		i++;
+	}
+
+	id<MTLBuffer> buffer = [tlsfHeap
+		newBufferWithLength:size
+		options:gMtl4ResourceOptionsFor[memory]
+		offset:offset];
+	assert(buffer != nil && "If the tlsf allocation succeeded, then the buffer allocation should also succeed.");
+
+	allocation->allocation = tlsfAllocation;
+	allocation->pool = pool;
+	*offsetInHeap = offset;
+	*heap = tlsfHeap;
+	CMN_SET_RESULT(result, GPU_SUCCESS);
+	return buffer;
+}
+
+void mtl4SmallAllocate(Mtl4AllocationMetadata* metadata, size_t size, size_t align, GpuMemory memory, GpuResult* result) {
+	GpuResult localResult;
+
+	metadata->buffer = mtl4AllocateSmallMemory(size, align, memory, &metadata->small, &metadata->backing, &metadata->offsetInBacking, &localResult);
+	if (localResult != GPU_SUCCESS) {
+		CMN_SET_RESULT(result, localResult);
+		return;
+	}
+
+	metadata->memory	= memory;
+	metadata->gpuPtr	= [metadata->buffer gpuAddress];
+	metadata->size		= size;
+	metadata->isSmallAllocation = true;
+
+	if (memory != GPU_MEMORY_GPU) {
+		metadata->cpuPtr = (uintptr_t)[metadata->buffer contents];
+	}
+}
+
+void mtl4AllocateSmallAllocationStorage(GpuMemory memory, GpuResult* result) {
+	CmnResult localResult;
+	GpuResult localGpuResult;
+
+	CmnExponentialArray<Mtl4SmallAllocationStorage>* storages;
+	switch (memory) {
+		case GPU_MEMORY_DEFAULT: {
+			storages = &gMtl4AllocationStorage.defaultSmallAllocations;
+			break;
+		}
+		case GPU_MEMORY_GPU: {
+			storages = &gMtl4AllocationStorage.privateSmallAllocations;
+			break;
+		}
+		case GPU_MEMORY_READBACK: {
+			storages = &gMtl4AllocationStorage.readbackSmallAllocations;
+			break;
+		}
+	}
+
+	Mtl4SmallAllocationStorage storage = {};
+
+	storage.heap = mtl4AllocateHeap(64 * 1024 * 1024, 0, memory, &localGpuResult);
+	if (localGpuResult != GPU_SUCCESS) {
+		CMN_SET_RESULT(result, localGpuResult);
+		return;
+	}
+
+	tlsfInitPool(&storage.pool, cmnPoolAllocator(&gMtl4AllocationStorage.miscPool), 64 * 1024 * 1024, &localResult);
+	if (localResult != CMN_SUCCESS) {
+		[storage.heap release];
+
+		CMN_SET_RESULT(result, GPU_OUT_OF_CPU_MEMORY);
+		return;
+	}
+
+	cmnAppend(storages, storage, &localResult);
+	if (localResult != CMN_SUCCESS) {
+		[storage.heap release];
+
+		CMN_SET_RESULT(result, GPU_OUT_OF_CPU_MEMORY);
+		return;
+	}
+
+	mtl4AddAllocationToResidencySet(storage.heap);
+
+	CMN_SET_RESULT(result, GPU_SUCCESS);
+}
+
 void* mtl4Malloc(size_t size, size_t align, GpuMemory memory, GpuResult* result) {
 	CmnScopedNSAutoreleasePool pool;
 
@@ -102,30 +281,28 @@ void* mtl4Malloc(size_t size, size_t align, GpuMemory memory, GpuResult* result)
 	GpuResult localGpuResult = GPU_SUCCESS;
 	bool failed = false;
 
-	id<MTLHeap> heap = mtl4AllocateHeap(size, align, memory, &localGpuResult);
-	if (localGpuResult != GPU_SUCCESS) {
-		CMN_SET_RESULT(result, localGpuResult);
-		return nullptr;
-	}
-	defer (if (failed) [heap release]);
-
-	id<MTLBuffer> buffer = [heap
-		newBufferWithLength:size
-		options:gMtl4ResourceOptionsFor[memory]
-		offset:0];
-	assert(buffer != nil && "If the heap allocation succeeded, then the buffer allocation should also succeed.");
-	defer (if (failed) [buffer release]);
-
 	Mtl4AllocationMetadata metadata = {};
-	metadata.memory			= memory;
-	metadata.gpuPtr			= [buffer gpuAddress];
-	metadata.size			= size;
-	metadata.backing		= heap;
-	metadata.buffer			= buffer;
-
-	if (memory != GPU_MEMORY_GPU) {
-		metadata.cpuPtr = (uintptr_t)[buffer contents];
+	if (size < MTL4_SMALL_MEMORY_THRESHOLD) {
+		mtl4SmallAllocate(&metadata, size, align, memory, &localGpuResult);
+		if (localGpuResult != GPU_SUCCESS) {
+			CMN_SET_RESULT(result, localGpuResult);
+			return nullptr;
+		}
+	} else {
+		mtl4BigAllocate(&metadata, size, align, memory, &localGpuResult);
+		if (localGpuResult != GPU_SUCCESS) {
+			CMN_SET_RESULT(result, localGpuResult);
+			return nullptr;
+		}
 	}
+
+	defer (if (failed && size >= MTL4_SMALL_MEMORY_THRESHOLD) {
+		[metadata.backing release];
+		[metadata.buffer release];
+	});
+	defer (if (failed && size < MTL4_SMALL_MEMORY_THRESHOLD) {
+		
+	});
 
 	CmnScopedStorageSyncLockWrite guard(&gMtl4AllocationStorage.sync);
 	
@@ -173,7 +350,9 @@ void* mtl4Malloc(size_t size, size_t align, GpuMemory memory, GpuResult* result)
 		defer (if (failed) cmnRemove(&gMtl4AllocationStorage.cpuDirectLookup, metadata.cpuPtr));
 	}
 
-	mtl4AddAllocationToResidencySet(heap);
+	if (!metadata.isSmallAllocation) {
+		mtl4AddAllocationToResidencySet(metadata.backing);
+	}
 
 	if (memory == GPU_MEMORY_GPU) {
 		CMN_SET_RESULT(result, GPU_SUCCESS);
@@ -439,7 +618,12 @@ void mtl4DestroyAllocation(Mtl4AllocationHandle handle) {
 	mtl4FreeAssociatedTextures(metadata);
 
 	[metadata->buffer release];
-	[metadata->backing release];
+
+	if (metadata->isSmallAllocation) {
+		tlsfFree(metadata->small.pool, metadata->small.allocation);
+	} else {
+		[metadata->backing release];
+	}
 
 	if (metadata->memory != GPU_MEMORY_GPU) {
 		Mtl4AddressRange cpuRange;
