@@ -24,7 +24,7 @@ fragment float4 vertexMain(
 	device	GpuTextureDescriptor*	textureHeap	[[buffer(1)]]
 ) {
 	constexpr metal::sampler s(metal::filter::nearest);
-	device texture2d<float>& tex = getTextureAt(textureHeap, 0);
+	device texture2d<float>& tex = getTextureAt(textureHeap, 1);
 	
 	return tex.sample(s, fragmentIn.uv);
 }

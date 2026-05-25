@@ -10,6 +10,8 @@
 typedef CmnHandle Mtl4Semaphore;
 
 typedef struct Mtl4SemaphoreMetadata {
+	// Atomic
+	bool			isScheduledForDeletion;
 	id<MTLSharedEvent>	event;
 } Mtl4SemaphoreMetadata;
 
@@ -28,7 +30,11 @@ void mtl4FiniSemaphoreStorage(void);
 
 GpuSemaphore mtl4CreateSemaphore(uint64_t value, GpuResult* result);
 void mtl4WaitSemaphore(GpuSemaphore sema, uint64_t value, GpuResult* result);
-void mtl4DestroySemaphore(GpuSemaphore sema);
+void mtl4FreeSemaphore(GpuSemaphore sema);
+
+void mtl4DestroySemaphore(Mtl4Semaphore sema);
+
+bool mtl4IsSemaphoreScheduledForDeletion(Mtl4Semaphore sema);
 
 inline GpuSemaphore mtl4HandleToGpuSemaphore(Mtl4Semaphore handle) {
 	return *(GpuSemaphore*)&handle;

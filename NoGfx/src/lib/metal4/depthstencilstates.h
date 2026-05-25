@@ -10,6 +10,8 @@
 typedef CmnHandle Mtl4DepthStencilState;
 
 typedef struct Mtl4DepthStencilStateMetadata {
+	// Atomic
+	bool 				isScheduledForDeletion;
 	GpuDepthStencilDesc		desc;
 
 	id<MTLDepthStencilState>	depthStencilState;
@@ -32,6 +34,11 @@ void mtl4FreeDepthStencilState(GpuDepthStencilState state);
 
 MTLDepthStencilDescriptor* mtl4GpuDepthStencilDescToMetal(const GpuDepthStencilDesc* desc);
 void mtl4ReleaseMetalDepthStencilDesc(MTLDepthStencilDescriptor* desc);
+
+// NOTE: Requires deletion lock on gMtl4DepthStencilStateStorage.sync
+void mtl4DestroyDepthStencilState(Mtl4DepthStencilState state);
+
+bool mtl4IsDepthStencilStateScheduledForDeletion(Mtl4DepthStencilState state);
 
 Mtl4DepthStencilStateMetadata* mtl4AcquireDepthStencilStateMetadataFrom(Mtl4DepthStencilState handle);
 void mtl4ReleaseDepthStencilStateMetadata(void);

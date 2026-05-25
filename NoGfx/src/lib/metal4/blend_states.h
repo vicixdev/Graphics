@@ -9,6 +9,7 @@
 typedef CmnHandle Mtl4BlendState;
 
 typedef struct Mtl4BlendStateMetadata {
+	bool		isScheduledForDeletion;
 	GpuBlendDesc	desc;
 } Mtl4BlendStateMetadata;
 
@@ -26,6 +27,11 @@ void mtl4FiniBlendStateStorage(void);
 
 GpuBlendState mtl4CreateBlendState(const GpuBlendDesc* desc, GpuResult* result);
 void mtl4FreeBlendState(GpuBlendState state);
+
+// NOTE: Requires deletion lock on gMtl4BlendStateStorage.sync
+void mtl4DestroyBlendState(Mtl4BlendState state);
+
+bool mtl4IsBlendStateScheduledForDeletion(Mtl4BlendState state);
 
 Mtl4BlendStateMetadata* mtl4AcquireBlendStateMetadata(Mtl4BlendState handle);
 void mtl4ReleaseBlendStateMetadata(void);

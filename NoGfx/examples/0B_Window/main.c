@@ -1,5 +1,6 @@
 #include <stdio.h>
 #include <unistd.h>
+#include <time.h>
 #include <gpu/gpu.h>
 
 #define RGFW_IMPLEMENTATION
@@ -18,25 +19,43 @@ typedef float Color[2];
 typedef struct VertexData {
 	void* positions;
 	void* uvs;
+	float direction;
+	uint32_t padding;
 } Arguments;
 
-const Position POSITIONS[] = {
+const Position QUAD_POSITIONS[] = {
 	{ -0.5, -0.5, 0.0 },
 	{  0.5, -0.5, 0.0 },
 	{  0.5,  0.5, 0.0 },
 	{ -0.5,  0.5, 0.0 },
 };
 
-const Color UVS[] = {
+const Color QUAD_UVS[] = {
 	{ 0.0, 1.0 },
 	{ 1.0, 1.0 },
 	{ 1.0, 0.0 },
 	{ 0.0, 0.0 },
 };
 
-const uint32_t INDICES[] = {
+const uint32_t QUAD_INDICES[] = {
 	0, 1, 2,
 	0, 2, 3,
+};
+
+const Position TRIANGLE_POSITIONS[] = {
+	{ -0.5,  0.75, 0.0 },
+	{ 0.0, -0.25, 0.0 },
+	{ -1.0, -0.25, 0.0 },
+};
+
+const Color TRIANGLE_UVS[] = {
+	{ 0.5, 0.0 },
+	{ 1.0, 1.0 },
+	{ 0.0, 1.0 },
+};
+
+const uint32_t TRIANGLE_INDICES[] = {
+	0, 1, 2,
 };
 
 uint8_t* readEntireFile(const char* file, size_t* fileLength) {
@@ -161,14 +180,18 @@ typedef struct GpuContext {
 	GpuArena		cpuArena;
 	GpuArena		gpuArena;
 
-	GpuAllocation		positions;
-	GpuAllocation		uvs;
-	GpuAllocation		indices;
+	GpuAllocation		trianglePositions;
+	GpuAllocation		triangleUvs;
+	GpuAllocation		triangleIndices;
 
-	GpuAllocation		textureMemory;
-	GpuTexture		texture;
+	GpuAllocation		quadPositions;
+	GpuAllocation		quadUvs;
+	GpuAllocation		quadIndices;
 
-	GpuAllocation		readback;
+	GpuAllocation		sceneryTextureMemory;
+	GpuTexture		sceneryTexture;
+	GpuAllocation		learnOpenGLTextureMemory;
+	GpuTexture		learnOpenGLTexture;
 
 	GpuPipeline		pipeline;
 } GpuContext;
@@ -185,8 +208,8 @@ GpuBackend selectBackend(void) {
 void init(void) {
 	GpuInitDesc desc;
 	desc.backend		= selectBackend();
-	desc.validationEnabled	= true;
-	desc.tracingEnabled	= true;
+	desc.validationEnabled	= false;
+	desc.tracingEnabled	= false;
 	desc.extraLayers	= NULL;
 	desc.extraLayerCount	= 0;
 
@@ -234,7 +257,8 @@ void init(void) {
 	printf("Using device `%s`.\n", devices[0].name);
 
 	GpuSurfaceDesc surfaceDesc;
-	surfaceDesc.type = GPU_SURFACE_VSYNC;
+	// surfaceDesc.type = GPU_SURFACE_VSYNC;
+	surfaceDesc.type = GPU_SURFACE_IMMEDIATE;
 	surfaceDesc.format = GPU_FORMAT_RGBA8_UNORM;
 	surfaceDesc.framesInFlight = 3;
 	surfaceDesc.size[0] = OUTPUT_WIDTH;
@@ -262,16 +286,20 @@ void init(void) {
 }
 
 void initBuffers(void) {
-	gGpuContext.positions	= gpuArenaAlloc(&gGpuContext.cpuArena, sizeof(POSITIONS));
-	gGpuContext.uvs		= gpuArenaAlloc(&gGpuContext.cpuArena, sizeof(UVS));
-	gGpuContext.indices	= gpuArenaAlloc(&gGpuContext.cpuArena, sizeof(INDICES));
+	gGpuContext.quadPositions	= gpuArenaAlloc(&gGpuContext.cpuArena, sizeof(QUAD_POSITIONS));
+	gGpuContext.quadUvs		= gpuArenaAlloc(&gGpuContext.cpuArena, sizeof(QUAD_UVS));
+	gGpuContext.quadIndices	= gpuArenaAlloc(&gGpuContext.cpuArena, sizeof(QUAD_INDICES));
+	gGpuContext.trianglePositions	= gpuArenaAlloc(&gGpuContext.cpuArena, sizeof(TRIANGLE_POSITIONS));
+	gGpuContext.triangleUvs		= gpuArenaAlloc(&gGpuContext.cpuArena, sizeof(TRIANGLE_UVS));
+	gGpuContext.triangleIndices	= gpuArenaAlloc(&gGpuContext.cpuArena, sizeof(TRIANGLE_INDICES));
 
-	memcpy(gGpuContext.positions.cpu, POSITIONS, sizeof(POSITIONS));
-	memcpy(gGpuContext.uvs.cpu, UVS, sizeof(UVS));
-	memcpy(gGpuContext.indices.cpu, INDICES, sizeof(INDICES));
+	memcpy(gGpuContext.quadPositions.cpu, QUAD_POSITIONS, sizeof(QUAD_POSITIONS));
+	memcpy(gGpuContext.quadUvs.cpu, QUAD_UVS, sizeof(QUAD_UVS));
+	memcpy(gGpuContext.quadIndices.cpu, QUAD_INDICES, sizeof(QUAD_INDICES));
 
-	gGpuContext.readback.cpu = (uint8_t*)gpuMalloc(OUTPUT_WIDTH * OUTPUT_HEIGHT * 4, 16, GPU_MEMORY_READBACK, NULL);
-	gGpuContext.readback.gpu = (uint8_t*)gpuHostToDevicePointer(gGpuContext.readback.cpu, NULL);
+	memcpy(gGpuContext.trianglePositions.cpu, TRIANGLE_POSITIONS, sizeof(TRIANGLE_POSITIONS));
+	memcpy(gGpuContext.triangleUvs.cpu, TRIANGLE_UVS, sizeof(TRIANGLE_UVS));
+	memcpy(gGpuContext.triangleIndices.cpu, TRIANGLE_INDICES, sizeof(TRIANGLE_INDICES));
 }
 
 void initPipeline(void) {
@@ -300,6 +328,45 @@ void initPipeline(void) {
 		&raster,
 		NULL
 	);
+}
+
+typedef struct FrameTimers {
+	struct timespec last;
+	int frames;
+	double accum;
+	char title[256];
+	const char* baseTitle;
+	double updateInterval;
+} FrameTimers;
+
+FrameTimers gFrameTimers;
+
+void initFrameTimers(const char* baseTitle, double updateInterval) {
+	clock_gettime(CLOCK_MONOTONIC, &gFrameTimers.last);
+	gFrameTimers.frames = 0;
+	gFrameTimers.accum = 0.0;
+	gFrameTimers.baseTitle = baseTitle;
+	gFrameTimers.updateInterval = updateInterval;
+	gFrameTimers.title[0] = '\0';
+}
+
+void updateFrameTimers(void) {
+	struct timespec now;
+	clock_gettime(CLOCK_MONOTONIC, &now);
+	double dt = (now.tv_sec - gFrameTimers.last.tv_sec) + (now.tv_nsec - gFrameTimers.last.tv_nsec) * 1e-9;
+	gFrameTimers.last = now;
+
+	gFrameTimers.frames += 1;
+	gFrameTimers.accum += dt;
+
+	if (gFrameTimers.accum >= gFrameTimers.updateInterval) {
+		double fps = (double)gFrameTimers.frames / gFrameTimers.accum;
+		double ms = 1000.0 / (fps > 0.0 ? fps : 1.0);
+		snprintf(gFrameTimers.title, sizeof(gFrameTimers.title), "%s - %.1f FPS (%.2f ms)", gFrameTimers.baseTitle, fps, ms);
+		RGFW_window_setName(gGpuContext.window, gFrameTimers.title);
+		gFrameTimers.frames = 0;
+		gFrameTimers.accum = 0.0;
+	}
 }
 
 GpuTexture loadTexture(GpuCommandBuffer cb, const char* file, GpuAllocation* textureMemory) {
@@ -358,29 +425,37 @@ void draw(GpuCommandBuffer cb) {
 	textureView.mipCount = 1;
 	textureView.format = GPU_FORMAT_RGBA8_UNORM;
 
-	GpuAllocation textureHeapAlloc = gpuBumpAlloc(&gGpuContext.bump, sizeof(GpuTextureDescriptor));
+	GpuAllocation textureHeapAlloc = gpuBumpAlloc(&gGpuContext.bump, sizeof(GpuTextureDescriptor) * 2);
 	GpuTextureDescriptor* textureHeap = (GpuTextureDescriptor*)textureHeapAlloc.cpu;
-	textureHeap[0] = gpuTextureViewDescriptor(gGpuContext.texture, &textureView, NULL);
+	textureHeap[0] = gpuTextureViewDescriptor(gGpuContext.sceneryTexture, &textureView, NULL);
+	textureHeap[1] = gpuTextureViewDescriptor(gGpuContext.learnOpenGLTexture, &textureView, NULL);
 
-	GpuAllocation argsAlloc = gpuBumpAlloc(&gGpuContext.bump, sizeof(Arguments));
+	GpuAllocation argsAlloc = gpuBumpAlloc(&gGpuContext.bump, sizeof(Arguments) * 2);
 	Arguments* args = (Arguments*)argsAlloc.cpu;
-	args->positions = gGpuContext.positions.gpu;
-	args->uvs = gGpuContext.uvs.gpu;
+	args[0].positions = gGpuContext.trianglePositions.gpu;
+	args[0].uvs = gGpuContext.triangleUvs.gpu;
+	args[0].direction = 1.0f;
+	args[1].positions = gGpuContext.quadPositions.gpu;
+	args[1].uvs = gGpuContext.quadUvs.gpu;
+	args[1].direction = 0.1f;
 
-	// GpuAllocation indirectArgsAlloc = gpuBumpAlloc(&gGpuContext.bump, sizeof(GpuMultiDrawIndirectArgs));
-	// GpuMultiDrawIndirectArgs* indirectArgs = (GpuMultiDrawIndirectArgs*)indirectArgsAlloc.cpu;
-	// indirectArgs->indices = gGpuContext.indices.gpu;
-	// indirectArgs->indexCount = 6;
-	// indirectArgs->instanceCount = 4;
+	GpuAllocation indirectArgsAlloc = gpuBumpAlloc(&gGpuContext.bump, sizeof(GpuMultiDrawIndirectArgs) * 2);
+	GpuMultiDrawIndirectArgs* indirectArgs = (GpuMultiDrawIndirectArgs*)indirectArgsAlloc.cpu;
+	indirectArgs[0].indices = gGpuContext.triangleIndices.gpu;
+	indirectArgs[0].indexCount = 3;
+	indirectArgs[0].instanceCount = 10 - (gGpuContext.onQueueDoneNext / 20) % 10;
+	indirectArgs[1].indices = gGpuContext.quadIndices.gpu;
+	indirectArgs[1].indexCount = 6;
+	indirectArgs[1].instanceCount = gGpuContext.onQueueDoneNext / 40 % 10 + 1;
 
-	// GpuAllocation drawCountAlloc = gpuBumpAlloc(&gGpuContext.bump, sizeof(uint32_t));
-	// uint32_t* drawCount = (uint32_t*)drawCountAlloc.cpu;
-	// *drawCount = 1;
+	GpuAllocation drawCountAlloc = gpuBumpAlloc(&gGpuContext.bump, sizeof(uint32_t));
+	uint32_t* drawCount = (uint32_t*)drawCountAlloc.cpu;
+	*drawCount = 2;
 
 	gpuSetActiveTextureHeapPtr(cb, textureHeapAlloc.gpu, NULL);
 	gpuSetPipeline(cb, gGpuContext.pipeline, NULL);
-	// gpuDrawIndexedInstancedIndirectMulti(cb, argsAlloc.gpu, sizeof(Arguments), NULL, 0, indirectArgsAlloc.gpu, drawCountAlloc.gpu, NULL);
-	gpuDrawIndexedInstanced(cb, argsAlloc.gpu, NULL, gGpuContext.indices.gpu, 6, 4, NULL);
+	gpuDrawIndexedInstancedIndirectMulti(cb, argsAlloc.gpu, sizeof(Arguments), NULL, 0, indirectArgsAlloc.gpu, drawCountAlloc.gpu, NULL);
+	// gpuDrawIndexedInstanced(cb, argsAlloc.gpu, NULL, gGpuContext.indices.gpu, 6, 4, NULL);
 }
 
 int main(void) {
@@ -391,10 +466,13 @@ int main(void) {
 	int currWidth = OUTPUT_WIDTH;
 	int currHeight = OUTPUT_HEIGHT;
 
+	initFrameTimers("Metal 4", 0.5);
+
 	GpuResult result;
 
 	GpuCommandBuffer cb = gpuStartCommandEncoding(gGpuContext.queue, NULL);
-	gGpuContext.texture = loadTexture(cb, "./image.png", &gGpuContext.textureMemory);
+	gGpuContext.sceneryTexture = loadTexture(cb, "./image.png", &gGpuContext.sceneryTextureMemory);
+	gGpuContext.learnOpenGLTexture = loadTexture(cb, "./OpenGL.png", &gGpuContext.learnOpenGLTextureMemory);
 	gpuSubmitWithSignal(gGpuContext.queue, &cb, 1, gGpuContext.onQueueDone, ++gGpuContext.onQueueDoneNext, NULL);
 
 	gpuWaitSemaphore(gGpuContext.onQueueDone, 1, NULL);
@@ -427,6 +505,8 @@ int main(void) {
 		gpuSubmitWithSignal(gGpuContext.queue, &cb, 1, gGpuContext.onQueueDone, ++gGpuContext.onQueueDoneNext, NULL);
 		gpuPresent(gGpuContext.queue, gGpuContext.surface, NULL);
 
+		/* FPS / ms update */
+		updateFrameTimers();
 		if (RGFW_isKeyDown(RGFW_escape)) {
 			RGFW_window_setShouldClose(gGpuContext.window, true);
 		}

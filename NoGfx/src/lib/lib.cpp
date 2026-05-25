@@ -220,8 +220,8 @@ void gpuWaitSemaphore(GpuSemaphore sema, uint64_t value, GpuResult* result) {
 	GPU_LAYERED_CALL(gpuWaitSemaphore, sema, value, result);
 }
 
-void gpuDestroySemaphore(GpuSemaphore sema) {
-	GPU_LAYERED_CALL(gpuDestroySemaphore, sema);
+void gpuFreeSemaphore(GpuSemaphore sema) {
+	GPU_LAYERED_CALL(gpuFreeSemaphore, sema);
 }
 
 void gpuMemCpy(GpuCommandBuffer cb, void* destGpu, void* srcGpu, size_t size, GpuResult* result) {

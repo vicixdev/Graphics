@@ -4,6 +4,7 @@
 #include <lib/common/scoped_nsautoreleasepool.h>
 #include <lib/metal4/context.h>
 #include <lib/metal4/tables.h>
+#include <lib/metal4/deletion_manager.h>
 
 Mtl4DepthStencilStateStorage gMtl4DepthStencilStateStorage;
 
@@ -59,12 +60,20 @@ GpuDepthStencilState mtl4CreateDepthStencilState(const GpuDepthStencilDesc* desc
 void mtl4FreeDepthStencilState(GpuDepthStencilState state) {
 	CmnScopedNSAutoreleasePool pool;
 
-	(void)state;
-	// TODO
+	Mtl4DepthStencilState handle = mtl4GpuDepthStencilStateToHandle(state);
+	Mtl4DepthStencilStateMetadata* metadata = mtl4AcquireDepthStencilStateMetadataFrom(handle);
+	if (metadata == nullptr) {
+		return;
+	}
+	cmnAtomicStore(&metadata->isScheduledForDeletion, true);
+
+	mtl4ReleaseDepthStencilStateMetadata();
+	mtl4ScheduleDepthStencilStateForDeleltion(handle);
+	mtl4CheckForResourceDeletion();
 }
 
 MTLDepthStencilDescriptor* mtl4GpuDepthStencilDescToMetal(const GpuDepthStencilDesc* desc) {
-	MTLDepthStencilDescriptor* metalDesc = [[MTLDepthStencilDescriptor new] autorelease];
+	MTLDepthStencilDescriptor* metalDesc = [MTLDepthStencilDescriptor new];
 
 	metalDesc.frontFaceStencil = [[MTLStencilDescriptor new] autorelease];
 	metalDesc.frontFaceStencil.stencilCompareFunction = gMtl4GpuOpToMtlCompareFunction[desc->stencilFront.test];
@@ -88,7 +97,27 @@ MTLDepthStencilDescriptor* mtl4GpuDepthStencilDescToMetal(const GpuDepthStencilD
 	return metalDesc;
 }
 
-void mtl4ReleaseMetalDepthStencilDesc(MTLDepthStencilDescriptor* desc);
+void mtl4DestroyDepthStencilState(Mtl4DepthStencilState state) {
+	bool wasHandleValid;
+	Mtl4DepthStencilStateMetadata* metadata = &cmnGet(&gMtl4DepthStencilStateStorage.depthStencilStates, state, &wasHandleValid);
+	if (!wasHandleValid) {
+		return;
+	}
+
+	[metadata->depthStencilState release];
+
+	cmnRemove(&gMtl4DepthStencilStateStorage.depthStencilStates, state);
+}
+
+bool mtl4IsDepthStencilStateScheduledForDeletion(Mtl4DepthStencilState state) {
+	Mtl4DepthStencilStateMetadata* metadata = mtl4AcquireDepthStencilStateMetadataFrom(state);
+	if (metadata == nullptr) {
+		return false;
+	}
+	defer (mtl4ReleaseDepthStencilStateMetadata());
+
+	return cmnAtomicLoad(&metadata->isScheduledForDeletion);
+}
 
 Mtl4DepthStencilStateMetadata* mtl4AcquireDepthStencilStateMetadataFrom(Mtl4DepthStencilState handle) {
 	bool didFindResource;

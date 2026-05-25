@@ -151,6 +151,14 @@ int main(void) {
 		return -1;
 	}
 
+	void* gpuTexture2Buffer = gpuMalloc(sizeAlign.size + 1024, sizeAlign.align, GPU_MEMORY_GPU, NULL);
+	GpuTexture texture2 = gpuCreateTexture(&textureDescriptor, gpuTexture2Buffer, &result);
+	if (result != GPU_SUCCESS) {
+		printf("Failed to create texture. Got error %d.\n", result);
+		gpuDeinit();
+		return -1;
+	}
+
 	GpuQueue queue = gpuCreateQueue(NULL);
 
 	GpuCommandBuffer commandBuffer = gpuStartCommandEncoding(queue, NULL);
@@ -168,7 +176,7 @@ int main(void) {
 
 	commandBuffer = gpuStartCommandEncoding(queue, NULL);
 	copyResult = GPU_SUCCESS;
-	gpuCopyFromTexture(commandBuffer, downloadBuffer.gpu, gpuTextureBuffer, texture, &copyResult);
+	gpuMemCpy(commandBuffer, (uint8_t*)gpuTexture2Buffer, gpuTextureBuffer, sizeAlign.size, NULL);
 	if (copyResult != GPU_SUCCESS) {
 		printf("gpuCopyFromTexture failed with error %d.\n", copyResult);
 	}
@@ -176,7 +184,11 @@ int main(void) {
 	gpuWaitSemaphore(semaphore, 2, NULL);
 
 	commandBuffer = gpuStartCommandEncoding(queue, NULL);
-	gpuMemCpy(commandBuffer, downloadBuffer.gpu, gpuTempData.gpu, imageSize, &copyResult);
+	copyResult = GPU_SUCCESS;
+	gpuCopyFromTexture(commandBuffer, downloadBuffer.gpu, gpuTexture2Buffer, texture2, &copyResult);
+	if (copyResult != GPU_SUCCESS) {
+		printf("gpuCopyFromTexture failed with error %d.\n", copyResult);
+	}
 	gpuSubmitWithSignal(queue, &commandBuffer, 1, semaphore, 3, NULL);
 	gpuWaitSemaphore(semaphore, 3, NULL);
 

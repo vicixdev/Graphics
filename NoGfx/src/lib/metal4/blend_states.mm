@@ -1,6 +1,7 @@
 #include "blend_states.h"
 
 #include <lib/common/scoped_nsautoreleasepool.h>
+#include <lib/metal4/deletion_manager.h>
 
 Mtl4BlendStateStorage gMtl4BlendStateStorage;
 
@@ -48,7 +49,30 @@ GpuBlendState mtl4CreateBlendState(const GpuBlendDesc* desc, GpuResult* result) 
 void mtl4FreeBlendState(GpuBlendState state) {
 	CmnScopedNSAutoreleasePool pool;
 
-	(void)state;
+	Mtl4BlendState handle = mtl4GpuBlendStateToHandle(state);
+	Mtl4BlendStateMetadata* metadata = mtl4AcquireBlendStateMetadata(handle);
+	if (metadata == nullptr) {
+		return;
+	}
+	cmnAtomicStore(&metadata->isScheduledForDeletion, true);
+
+	mtl4ReleaseBlendStateMetadata();
+	mtl4ScheduleBlendStateForDeletion(handle);
+	mtl4CheckForResourceDeletion();
+}
+
+void mtl4DestroyBlendState(Mtl4BlendState state) {
+	cmnRemove(&gMtl4BlendStateStorage.blendStates, state);
+}
+
+bool mtl4IsBlendStateScheduledForDeletion(Mtl4BlendState state) {
+	Mtl4BlendStateMetadata* metadata = mtl4AcquireBlendStateMetadata(state);
+	if (metadata == nullptr) {
+		return false;
+	}
+	defer (mtl4ReleaseBlendStateMetadata());
+
+	return cmnAtomicLoad(&metadata->isScheduledForDeletion);
 }
 
 Mtl4BlendStateMetadata* mtl4AcquireBlendStateMetadata(Mtl4BlendState handle) {

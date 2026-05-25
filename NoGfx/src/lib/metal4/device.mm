@@ -1,5 +1,6 @@
 #include "device.h"
 
+#include <lib/common/scoped_nsautoreleasepool.h>
 #include <lib/metal4/context.h>
 #include <lib/metal4/allocation.h>
 #include <lib/metal4/pipelines.h>
@@ -104,6 +105,7 @@ void mtl4EnumerateDevices(GpuDeviceInfo** devices, size_t* devices_count, GpuRes
 
 void mtl4SelectDevice(GpuDeviceId deviceId, GpuResult* result) {
 
+	CmnScopedNSAutoreleasePool pool;
 	GpuResult localResult;
 
 	mtl4PrepareContextWithDevice(deviceId, &localResult);

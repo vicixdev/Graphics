@@ -47,6 +47,19 @@
         {
             "type": "lldb",
             "request": "launch",
+            "name": "03_Textures",
+            "program": "${workspaceFolder}/examples/03_Textures/out",
+            "args": [],
+            "env": {
+                "MTL_DEBUG_LAYER": "1",
+                // "MTL_DEBUG_LAYER_WARNING_MODE": "nslog",
+                // "MTL_CAPTURE_ENABLED": "1"
+            },
+            "cwd": "${workspaceFolder}/examples/03_Textures"
+        },
+        {
+            "type": "lldb",
+            "request": "launch",
             "name": "04_Signals",
             "program": "${workspaceFolder}/examples/04_Signals/out",
             "args": [],

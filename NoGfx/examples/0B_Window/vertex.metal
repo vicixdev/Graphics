@@ -5,6 +5,7 @@ using namespace metal;
 struct VertexIn {
 	device packed_float3*	positions;
 	device packed_float2*	uvs;
+	float			direction;
 };
 
 struct VertexOut {
@@ -21,7 +22,7 @@ vertex VertexOut vertexMain(
 	float3 position	= float3(vertexData.positions[vertexIndex]);
 	float2 uv	= float2(vertexData.uvs[vertexIndex]);
 
-	position += float3(0.1, -0.1, 0.0) * instanceId;
+	position += float3(0.1, -0.1, 0.0) * instanceId * float3(cos(vertexData.direction), sin(vertexData.direction), 1.0f);
 
 	VertexOut out;
 	out.position	= float4(position, 1.0);

@@ -6,6 +6,11 @@
 
 #include "personality.cpp"
 
+#ifdef NOGFX_ENABLE_TRACY
+	#define TRACY_ENABLE
+	#include <TracyClient.cpp>
+#endif
+
 #include <lib/common/page_posix.cpp>
 #include <lib/common/futex_darwin.cpp>
 #include <lib/common/arena.cpp>

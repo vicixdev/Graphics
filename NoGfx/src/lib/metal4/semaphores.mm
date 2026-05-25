@@ -1,6 +1,8 @@
 #include "semaphores.h"
 
+#include <lib/common/scoped_nsautoreleasepool.h>
 #include <lib/metal4/context.h>
+#include <lib/metal4/deletion_manager.h>
 
 Mtl4SemaphoreStorage gMtl4SemaphoreStorage;
 
@@ -30,6 +32,7 @@ void mtl4FiniSemaphoreStorage(void) {
 }
 
 GpuSemaphore mtl4CreateSemaphore(uint64_t value, GpuResult* result) {
+	CmnScopedNSAutoreleasePool pool;
 	CmnResult localResult;
 
 	Mtl4SemaphoreMetadata metadata = {};
@@ -58,6 +61,8 @@ GpuSemaphore mtl4CreateSemaphore(uint64_t value, GpuResult* result) {
 }
 
 void mtl4WaitSemaphore(GpuSemaphore sema, uint64_t value, GpuResult* result) {
+	CmnScopedNSAutoreleasePool pool;
+
 	Mtl4Semaphore handle = mtl4GpuSemaphoreToHandle(sema);
 
 	Mtl4SemaphoreMetadata* metadata = mtl4AcquireSemaphoreMetadataFrom(handle);
@@ -73,8 +78,41 @@ void mtl4WaitSemaphore(GpuSemaphore sema, uint64_t value, GpuResult* result) {
 	return;
 }
 
-void mtl4DestroySemaphore(GpuSemaphore sema) {
-	(void)sema;
+void mtl4FreeSemaphore(GpuSemaphore sema) {
+	CmnScopedNSAutoreleasePool pool;
+
+	Mtl4Semaphore handle = mtl4GpuSemaphoreToHandle(sema);
+	Mtl4SemaphoreMetadata* metadata = mtl4AcquireSemaphoreMetadataFrom(handle);
+	if (metadata == nullptr) {
+		return;
+	}
+	cmnAtomicStore(&metadata->isScheduledForDeletion, true);
+
+	mtl4ReleaseSemaphoreMetadata();
+	mtl4ScheduleSemaphoreForDeletion(handle);
+	mtl4CheckForResourceDeletion();
+}
+
+void mtl4DestroySemaphore(Mtl4Semaphore semaphore) {
+	bool wasHandleValid;
+	Mtl4SemaphoreMetadata* metadata = &cmnGet(&gMtl4SemaphoreStorage.semaphores, semaphore, &wasHandleValid);
+	if (!wasHandleValid) {
+		return;
+	}
+
+	[metadata->event release];
+
+	cmnRemove(&gMtl4SemaphoreStorage.semaphores, semaphore);
+}
+
+bool mtl4IsSemaphoreScheduledForDeletion(Mtl4Semaphore semaphore) {
+	Mtl4SemaphoreMetadata* metadata = mtl4AcquireSemaphoreMetadataFrom(semaphore);
+	if (metadata == nullptr) {
+		return false;
+	}
+	defer (mtl4ReleaseSemaphoreMetadata());
+
+	return cmnAtomicLoad(&metadata->isScheduledForDeletion);
 }
 
 Mtl4SemaphoreMetadata* mtl4AcquireSemaphoreMetadataFrom(Mtl4Semaphore semaphore) {

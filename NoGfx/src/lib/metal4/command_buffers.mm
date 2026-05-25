@@ -48,6 +48,7 @@ void mtl4FiniCommandBufferStorage(void) {
 
 GpuCommandBuffer mtl4StartCommandEncoding(GpuQueue queue, GpuResult* result) {
 	(void)queue;
+	CmnScopedNSAutoreleasePool pool;
 
 	CmnResult localResult;
 

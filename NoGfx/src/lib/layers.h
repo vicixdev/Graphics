@@ -71,7 +71,7 @@ typedef struct GpuBaseLayer {
 
 	GpuSemaphore (*gpuCreateSemaphore)(uint64_t value, GpuResult* result);
 	void (*gpuWaitSemaphore)(GpuSemaphore sema, uint64_t value, GpuResult* result);
-	void (*gpuDestroySemaphore)(GpuSemaphore sema);
+	void (*gpuFreeSemaphore)(GpuSemaphore sema);
 
 	void (*gpuMemCpy)(GpuCommandBuffer cb, void* destGpu, void* srcGpu, size_t size, GpuResult* result);
 	void (*gpuCopyToTexture)(GpuCommandBuffer cb, void* destGpu, void* srcGpu, GpuTexture texture, GpuResult* result);

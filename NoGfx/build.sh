@@ -1,16 +1,72 @@
 #!/usr/bin/env sh
-
 set -e
 
-xcrun -sdk macosx metal -frecord-sources -gline-tables-only -c ./src/lib/metal4/shader/prep_multidrawindirect.metal -o ./build/prep_multidrawindirect.air
-xcrun -sdk macosx metallib ./build/prep_multidrawindirect.air -o ./build/prep_multidrawindirect.metallib
-./tools/bin2cpp.py ./build/prep_multidrawindirect.metallib -o ./src/lib/metal4/shader/prep_multidrawindirect.metal.cpp -H ./src/lib/metal4/shader/prep_multidrawindirect.metal.h -v gMtl4PrepareMultidrawIndirectIcbsBytecode
+########################################################################################################################
+# BUILD CONFIG
+########################################################################################################################
+CPP=c++
+AR=ar
+METAL="xcrun -sdk macosx metal"
+METALLIB="xcrun -sdk macosx metallib"
+BUILD_FOLDER="./build"
 
-xcrun -sdk macosx metal -frecord-sources -gline-tables-only -c ./src/lib/metal4/shader/acquire_icb_range.metal -o ./build/acquire_icb_range.air
-xcrun -sdk macosx metallib ./build/acquire_icb_range.air -o ./build/acquire_icb_range.metallib
-./tools/bin2cpp.py ./build/acquire_icb_range.metallib -o ./src/lib/metal4/shader/acquire_icb_range.metal.cpp -H ./src/lib/metal4/shader/acquire_icb_range.metal.h -v gMtl4AcquireIcbRangeBytecode
+SHADER_SOURCES=("./src/lib/metal4/shader/acquire_icb_range.metal" "./src/lib/metal4/shader/prep_multidrawindirect.metal")
+SHADER_REFLECTED_NAMES=("gMtl4AcquireIcbRangeBytecode" "gMtl4PrepareMultidrawIndirectIcbsBytecode")
+DBG_METAL_ARGS=("-frecord-sources" "-gline-tables-only")
+REL_METAL_ARGS=("-O2")
 
-c++ -c -o build/gpu.o -fvisibility-inlines-hidden -fvisibility=hidden -fno-objc-arc -Wall -Wextra -Wpedantic -Iinclude -Isrc -std=c++11 -g -xobjective-c++ -fno-exceptions -fno-rtti -fno-unwind-tables -fno-asynchronous-unwind-tables -nostdlib++ src/_build/build.cpp
+BUILD_FILE="./src/_build/build.cpp"
+ARTIFACT="libgpu.a"
+INCLUDE_FOLDERS=("./include" "./src")
+DBG_CPP_ARGS=(																\
+	"-std=c++11" "-xobjective-c++" "-fno-objc-arc"							\
+	"-Wall" "-Wextra" "-Wpedantic"											\
+	"-fvisibility-inlines-hidden" "-fvisibility=hidden"						\
+	"-fno-exceptions" "-fno-rtti" "-nostdlib++"								\
+	"-fno-unwind-tables" "-fno-asynchronous-unwind-tables"					\
+	"-g"																	\
+)
+REL_CPP_ARGS=(																\
+	"-std=c++11" "-xobjective-c++" "-fno-objc-arc"							\
+	"-Wall" "-Wextra" "-Wpedantic"											\
+	"-fvisibility-inlines-hidden" "-fvisibility=hidden"						\
+	"-fno-exceptions" "-fno-rtti" "-nostdlib++"								\
+	"-fno-unwind-tables" "-fno-asynchronous-unwind-tables"					\
+	"-O2"																	\
+)
 
-ar rcs build/libgpu.a build/gpu.o
+
+########################################################################################################################
+# BUILD
+########################################################################################################################
+if [[ "$1" = "rel" ]]; then
+	METAL_ARGS=("${REL_METAL_ARGS[@]}")
+	CPP_ARGS=("${REL_CPP_ARGS[@]}")
+else
+	METAL_ARGS=("${DBG_METAL_ARGS[@]}")
+	CPP_ARGS=("${DBG_CPP_ARGS[@]}")
+fi
+
+echo ${METAL_ARGS[@]}
+echo ${CPP_ARGS[@]}
+
+
+for i in "${!SHADER_SOURCES[@]}"; do
+	shaderSource="${SHADER_SOURCES[$i]}"
+	shaderFile=$(basename "$shaderSource")
+	shaderName="${SHADER_REFLECTED_NAMES[$i]}"
+	airFile="$BUILD_FOLDER"/"$shaderFile.air"
+	metallibFile="$BUILD_FOLDER"/"$shaderFile.metal"
+
+	$METAL "${METAL_ARGS[@]}" -c "$shaderSource" -o "$BUILD_FOLDER"/"$shaderFile.air"
+	$METALLIB "$airFile" -o "$metallibFile"
+	./tools/bin2cpp.py "$metallibFile" -o "$shaderSource".cpp -H "$shaderSource".h -v "$shaderName"
+done
+
+for include in "${INCLUDE_FOLDERS[@]}"; do
+	CPP_ARGS+=("-I$include")
+done
+
+$CPP "${CPP_ARGS[@]}" -c "$BUILD_FILE" -o "$BUILD_FOLDER"/"$ARTIFACT".o 
+$AR rcs "$BUILD_FOLDER"/"$ARTIFACT" "$BUILD_FOLDER"/"$ARTIFACT".o
 

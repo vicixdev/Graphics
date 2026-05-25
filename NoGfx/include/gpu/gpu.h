@@ -463,7 +463,7 @@ typedef struct GpuLayer {
 
 	bool (*gpuCreateSemaphore)(uint64_t value, GpuResult* result);
 	bool (*gpuWaitSemaphore)(GpuSemaphore sema, uint64_t value, GpuResult* result);
-	bool (*gpuDestroySemaphore)(GpuSemaphore sema);
+	bool (*gpuFreeSemaphore)(GpuSemaphore sema);
 
 	bool (*gpuMemCpy)(GpuCommandBuffer cb, void* destGpu, void* srcGpu, size_t size, GpuResult* result);
 	bool (*gpuCopyToTexture)(GpuCommandBuffer cb, void* destGpu, void* srcGpu, GpuTexture texture, GpuResult* result);
@@ -565,7 +565,7 @@ void gpuPresent(GpuQueue queue, GpuSurface surface, GpuResult* result);
 
 GpuSemaphore gpuCreateSemaphore(uint64_t value, GpuResult* result);
 void gpuWaitSemaphore(GpuSemaphore sema, uint64_t value, GpuResult* result);
-void gpuDestroySemaphore(GpuSemaphore sema);
+void gpuFreeSemaphore(GpuSemaphore sema);
 
 void gpuMemCpy(GpuCommandBuffer cb, void* destGpu, void* srcGpu, size_t size, GpuResult* result);
 void gpuCopyToTexture(GpuCommandBuffer cb, void* destGpu, void* srcGpu, GpuTexture texture, GpuResult* result);

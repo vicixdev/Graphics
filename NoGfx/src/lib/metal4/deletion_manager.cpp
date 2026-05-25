@@ -5,7 +5,7 @@ Mtl4DeletionManager gMtl4DeletionManager;
 void mtl4InitDeletionManager(GpuResult* result) {
 	CmnResult localResult;
 
-	gMtl4DeletionManager.page = cmnCreatePage(1024 * 1024, CMN_PAGE_READABLE | CMN_PAGE_WRITABLE, &localResult);
+	gMtl4DeletionManager.page = cmnCreatePage(32 * 1024 * 1024, CMN_PAGE_READABLE | CMN_PAGE_WRITABLE, &localResult);
 	if (localResult != CMN_SUCCESS) {
 		CMN_SET_RESULT(result, GPU_OUT_OF_CPU_MEMORY);
 		return;
@@ -27,6 +27,30 @@ void mtl4InitDeletionManager(GpuResult* result) {
 	}
 
 	cmnCreateExponentialArray(&gMtl4DeletionManager.pipelines, arenaAllocator, &localResult);
+	if (localResult != CMN_SUCCESS) {
+		CMN_SET_RESULT(result, GPU_OUT_OF_CPU_MEMORY);
+		return;
+	}
+
+	cmnCreateExponentialArray(&gMtl4DeletionManager.surfaces, arenaAllocator, &localResult);
+	if (localResult != CMN_SUCCESS) {
+		CMN_SET_RESULT(result, GPU_OUT_OF_CPU_MEMORY);
+		return;
+	}
+
+	cmnCreateExponentialArray(&gMtl4DeletionManager.depthStencilStates, arenaAllocator, &localResult);
+	if (localResult != CMN_SUCCESS) {
+		CMN_SET_RESULT(result, GPU_OUT_OF_CPU_MEMORY);
+		return;
+	}
+
+	cmnCreateExponentialArray(&gMtl4DeletionManager.blendStates, arenaAllocator, &localResult);
+	if (localResult != CMN_SUCCESS) {
+		CMN_SET_RESULT(result, GPU_OUT_OF_CPU_MEMORY);
+		return;
+	}
+
+	cmnCreateExponentialArray(&gMtl4DeletionManager.semaphores, arenaAllocator, &localResult);
 	if (localResult != CMN_SUCCESS) {
 		CMN_SET_RESULT(result, GPU_OUT_OF_CPU_MEMORY);
 		return;
@@ -67,10 +91,38 @@ void mtl4SchedulePipelineForDeletion(Mtl4Pipeline pipeline) {
 	gMtl4DeletionManager.pipelinesToDeallocate += 1;
 }
 
+void mtl4ScheduleSurfaceForDeletion(Mtl4Surface surface) {
+	CmnScopedMutex guard(&gMtl4DeletionManager.surfacesMutex);
+	cmnAppend(&gMtl4DeletionManager.surfaces, surface, nullptr);
+	gMtl4DeletionManager.surfacesToDeallocate += 1;
+}
+
+void mtl4ScheduleDepthStencilStateForDeleltion(Mtl4DepthStencilState depthStencil) {
+	CmnScopedMutex guard(&gMtl4DeletionManager.depthStencilStatesMutex);
+	cmnAppend(&gMtl4DeletionManager.depthStencilStates, depthStencil, nullptr);
+	gMtl4DeletionManager.depthStencilStatesToDeallocate += 1;
+}
+
+void mtl4ScheduleBlendStateForDeletion(Mtl4BlendState blend) {
+	CmnScopedMutex guard(&gMtl4DeletionManager.blendStatesMutex);
+	cmnAppend(&gMtl4DeletionManager.blendStates, blend, nullptr);
+	gMtl4DeletionManager.blendStatesToDeallocate += 1;
+}
+
+void mtl4ScheduleSemaphoreForDeletion(Mtl4Semaphore semaphore) {
+	CmnScopedMutex guard(&gMtl4DeletionManager.semaphoreMutex);
+	cmnAppend(&gMtl4DeletionManager.semaphores, semaphore, nullptr);
+	gMtl4DeletionManager.semaphoresToDeallocate += 1;
+}
+
 bool mtl4ShouldDeleteScheduledResources(void) {
 	return mtl4ShouldDeleteScheduledTextures() ||
 		mtl4ShouldDeleteScheduledAllocations() ||
-		mtl4ShouldDeleteScheduledPipelines();
+		mtl4ShouldDeleteScheduledPipelines() ||
+		mtl4ShouldDeleteScheduledSurfaces() ||
+		mtl4ShouldDeleteScheduledDepthStencilStates() ||
+		mtl4ShouldDeleteScheduledBlendStates() ||
+		mtl4ShouldDeleteScheduledSemaphores();
 }
 
 bool mtl4ShouldDeleteScheduledAllocations(void) {
@@ -88,6 +140,26 @@ bool mtl4ShouldDeleteScheduledPipelines(void) {
 	return gMtl4DeletionManager.pipelinesToDeallocate >= 64;
 }
 
+bool mtl4ShouldDeleteScheduledSurfaces(void) {
+	CmnScopedMutex guard(&gMtl4DeletionManager.surfacesMutex);
+	return gMtl4DeletionManager.surfacesToDeallocate >= 2;
+}
+
+bool mtl4ShouldDeleteScheduledDepthStencilStates(void) {
+	CmnScopedMutex guard(&gMtl4DeletionManager.depthStencilStatesMutex);
+	return gMtl4DeletionManager.depthStencilStatesToDeallocate >= 64;
+}
+
+bool mtl4ShouldDeleteScheduledBlendStates(void) {
+	CmnScopedMutex guard(&gMtl4DeletionManager.blendStatesMutex);
+	return gMtl4DeletionManager.blendStatesToDeallocate >= 128;
+}
+
+bool mtl4ShouldDeleteScheduledSemaphores(void) {
+	CmnScopedMutex guard(&gMtl4DeletionManager.semaphoreMutex);
+	return gMtl4DeletionManager.semaphoresToDeallocate >= 64;
+}
+
 void mtl4DeleteScheduledResources(void) {
 	if (mtl4ShouldDeleteScheduledAllocations()) {
 		mtl4DeleteScheduledAllocations();
@@ -99,6 +171,22 @@ void mtl4DeleteScheduledResources(void) {
 
 	if (mtl4ShouldDeleteScheduledPipelines()) {
 		mtl4DeleteScheduledPipelines();
+	}
+
+	if (mtl4ShouldDeleteScheduledSurfaces()) {
+		mtl4DeleteScheduledSurfaces();
+	}
+
+	if (mtl4ShouldDeleteScheduledDepthStencilStates()) {
+		mtl4DeleteScheduledDepthStencilStates();
+	}
+	
+	if (mtl4ShouldDeleteScheduledBlendStates()) {
+		mtl4DeleteScheduledBlendStates();
+	}
+
+	if (mtl4ShouldDeleteScheduledSemaphores()) {
+		mtl4DeleteScheduledSemaphores();
 	}
 }
 
@@ -136,6 +224,54 @@ void mtl4DeleteScheduledPipelines(void) {
 
 	cmnResize(&gMtl4DeletionManager.pipelines, 0, nullptr);
 	gMtl4DeletionManager.pipelinesToDeallocate = 0;
+}
+
+void mtl4DeleteScheduledSurfaces(void) {
+	CmnScopedStorageSyncDeletionLock guard(&gMtl4SurfaceStorage.sync);
+	CmnScopedMutex guardd(&gMtl4DeletionManager.surfacesMutex);
+
+	for (size_t i = 0; i < gMtl4DeletionManager.surfaces.length; i++) {
+		mtl4DestroySurface(gMtl4DeletionManager.surfaces[i]);
+	}
+
+	cmnResize(&gMtl4DeletionManager.surfaces, 0, nullptr);
+	gMtl4DeletionManager.surfacesToDeallocate = 0;
+}
+
+void mtl4DeleteScheduledDepthStencilStates(void) {
+	CmnScopedStorageSyncDeletionLock guard(&gMtl4DepthStencilStateStorage.sync);
+	CmnScopedMutex guardd(&gMtl4DeletionManager.depthStencilStatesMutex);
+
+	for (size_t i = 0; i < gMtl4DeletionManager.depthStencilStates.length; i++) {
+		mtl4DestroyDepthStencilState(gMtl4DeletionManager.depthStencilStates[i]);
+	}
+
+	cmnResize(&gMtl4DeletionManager.depthStencilStates, 0, nullptr);
+	gMtl4DeletionManager.depthStencilStatesToDeallocate = 0;
+}
+
+void mtl4DeleteScheduledBlendStates(void) {
+	CmnScopedStorageSyncDeletionLock guard(&gMtl4BlendStateStorage.sync);
+	CmnScopedMutex guardd(&gMtl4DeletionManager.blendStatesMutex);
+
+	for (size_t i = 0; i < gMtl4DeletionManager.blendStates.length; i++) {
+		mtl4DestroyBlendState(gMtl4DeletionManager.blendStates[i]);
+	}
+
+	cmnResize(&gMtl4DeletionManager.blendStates, 0, nullptr);
+	gMtl4DeletionManager.blendStatesToDeallocate = 0;
+}
+
+void mtl4DeleteScheduledSemaphores(void) {
+	CmnScopedStorageSyncDeletionLock guard(&gMtl4SemaphoreStorage.sync);
+	CmnScopedMutex guardd(&gMtl4DeletionManager.semaphoreMutex);
+
+	for (size_t i = 0; i < gMtl4DeletionManager.semaphores.length; i++) {
+		mtl4DestroySemaphore(gMtl4DeletionManager.semaphores[i]);
+	}
+
+	cmnResize(&gMtl4DeletionManager.semaphores, 0, nullptr);
+	gMtl4DeletionManager.semaphoresToDeallocate = 0;
 }
 
 void mtl4CheckForResourceDeletion(void) {

@@ -12,6 +12,9 @@
 typedef CmnHandle Mtl4Surface;
 
 typedef struct Mtl4SurfaceMetadata {
+	// Atomic
+	bool			scheduledForDeletion;
+
 	NSView*			targetView;
 	CAMetalLayer*		metalLayer;
 
@@ -41,6 +44,8 @@ void mtl4ReleaseDrawable(Mtl4SurfaceMetadata* metadata);
 // NOTE: Requires deletion lock on `gMtl4SurfaceStorage.sync`
 void mtl4DestroySurface(Mtl4Surface surface);
 void mtl4DestroySurface(Mtl4SurfaceMetadata* metadata);
+
+bool mtl4IsSurfaceScheduledForDeletion(Mtl4Surface surface);
 
 Mtl4SurfaceMetadata* mtl4AcquireSurfaceMetadata(Mtl4Surface surface);
 void mtl4ReleaseSurfaceMetadata(void);

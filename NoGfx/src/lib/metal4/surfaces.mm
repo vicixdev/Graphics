@@ -4,6 +4,7 @@
 #include <lib/metal4/context.h>
 #include <lib/metal4/textures.h>
 #include <lib/metal4/tables.h>
+#include <lib/metal4/deletion_manager.h>
 
 Mtl4SurfaceStorage gMtl4SurfaceStorage;
 
@@ -96,7 +97,19 @@ void mtl4ResizeSurface(GpuSurface surface, uint32_t size[2], GpuResult* result) 
 }
 
 void mtl4FreeSurface(GpuSurface surface) {
-	// TODO: Implement in deletion manager
+	CmnScopedNSAutoreleasePool pool;
+
+	Mtl4Surface handle = mtl4GpuSurfaceToHandle(surface);
+	Mtl4SurfaceMetadata* metadata = mtl4AcquireSurfaceMetadata(handle);
+	if (metadata == nullptr) {
+		return;
+	}
+	cmnAtomicStore(&metadata->scheduledForDeletion, true);
+
+	mtl4ReleaseSurfaceMetadata();
+
+	mtl4ScheduleSurfaceForDeletion(handle);
+	mtl4CheckForResourceDeletion();
 }
 
 GpuTexture mtl4AcquireNextDrawable(GpuSurface surface, GpuResult* result) {
@@ -154,6 +167,7 @@ void mtl4ReleaseDrawable(Mtl4SurfaceMetadata* metadata) {
 
 // NOTE: Requires deletion lock on `gMtl4SurfaceStorage.sync`
 void mtl4DestroySurface(Mtl4Surface surface) {
+
 	bool wasHandleValid;
 	Mtl4SurfaceMetadata* metadata = &cmnGet(&gMtl4SurfaceStorage.surfaces, surface, &wasHandleValid);
 	if (!wasHandleValid) {
@@ -172,6 +186,16 @@ void mtl4DestroySurface(Mtl4SurfaceMetadata* metadata) {
 
 	metadata->targetView.wantsLayer = NO;
 	metadata->targetView.layer = nil;
+}
+
+bool mtl4IsSurfaceScheduledForDeletion(Mtl4Surface surface) {
+	Mtl4SurfaceMetadata* metadata = mtl4AcquireSurfaceMetadata(surface);
+	if (metadata == nullptr) {
+		return false;
+	}
+	defer (mtl4ReleaseSurfaceMetadata());
+
+	return cmnAtomicLoad(&metadata->scheduledForDeletion);
 }
 
 Mtl4SurfaceMetadata* mtl4AcquireSurfaceMetadata(Mtl4Surface surface) {

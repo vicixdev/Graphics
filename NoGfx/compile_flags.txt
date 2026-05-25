@@ -3,8 +3,11 @@
 
 -I./include
 -I./src
+-I./vendor/tracy
 
 -Wall
 -Wextra
 -Wpedantic
+
+-DTRACY_ENABLE
 

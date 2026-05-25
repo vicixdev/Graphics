@@ -48,6 +48,8 @@ GpuQueue mtl4CreateQueue(GpuResult* result) {
 	CmnResult localResult;
 	GpuResult localGpuResult;
 
+	CmnScopedNSAutoreleasePool pool;
+
 	Mtl4QueueMetadata metadata = {};
 
 	metadata.queue = [gMtl4Context.device newMTL4CommandQueue];
@@ -118,9 +120,8 @@ void mtl4Submit(Mtl4CommandEmissionContext* emitContext, GpuCommandBuffer* comma
 }
 
 void mtl4Submit(GpuQueue queue, GpuCommandBuffer* commandBuffers, size_t commandBufferCount, GpuResult* result) {
-	GpuResult localResult;
-
 	CmnScopedNSAutoreleasePool pool;
+	GpuResult localResult;
 
 	Mtl4CommandEmissionContext* emitContext = mtl4AcquireCommandEmissionContext(queue, &localResult);
 	if (localResult != GPU_SUCCESS) {
@@ -140,8 +141,8 @@ void mtl4SubmitWithSignal(
 	uint64_t value,
 	GpuResult* result
 ) {
-	GpuResult localResult;
 	CmnScopedNSAutoreleasePool pool;
+	GpuResult localResult;
 
 	Mtl4CommandEmissionContext* emitContext = mtl4AcquireCommandEmissionContext(queue, &localResult);
 	if (localResult != GPU_SUCCESS) {
