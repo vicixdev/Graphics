@@ -1,4 +1,5 @@
 #include "queue.h"
+#include "gpu/gpu.h"
 #include "lib/common/result.h"
 
 #include <lib/common/scoped_nsautoreleasepool.h>
@@ -185,6 +186,8 @@ void mtl4Present(GpuQueue queue, GpuSurface surface, GpuResult* result) {
 
 	[surfaceMetadata->currentDrawable present];
 	mtl4ReleaseDrawable(surfaceMetadata);
+
+	CMN_SET_RESULT(result, GPU_SUCCESS);
 }
 
 Mtl4QueueMetadata* mtl4QueueMetadataOf(Mtl4Queue handle) {

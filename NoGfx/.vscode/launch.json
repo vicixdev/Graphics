@@ -173,6 +173,19 @@
                 // "MTL_CAPTURE_ENABLED": "1"
             },
             "cwd": "${workspaceFolder}/examples/0B_Window"
+        },
+        {
+            "type": "lldb",
+            "request": "launch",
+            "name": "Perf_boids",
+            "program": "${workspaceFolder}/perf/boids/boids",
+            "args": [],
+            "env": {
+                "MTL_DEBUG_LAYER": "1",
+                // "MTL_DEBUG_LAYER_WARNING_MODE": "nslog",
+                // "MTL_CAPTURE_ENABLED": "1"
+            },
+            "cwd": "${workspaceFolder}/perf/boids"
         }
     ]
 }

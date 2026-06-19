@@ -7,6 +7,7 @@
 **/*.a
 **/*.o
 **/*.metal.ir
+**/*.air
 **/*.metallib
 **/*.dSYM
 
